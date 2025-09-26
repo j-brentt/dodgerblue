@@ -17,3 +17,4 @@ MIT [License](LICENSE)
 - Jax Yopek
 - Jordan Brent
 - Titobiloluwa Adeniji
+- Zhikun Liu
