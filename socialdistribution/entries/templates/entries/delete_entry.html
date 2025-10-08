@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+{% block title %}Delete Entry - Social Distribution{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h2>Delete Entry</h2>
+    
+    <p style="margin: 20px 0; color: #666;">
+        Are you sure you want to delete the entry "<strong>{{ entry.title }}</strong>"?
+    </p>
+    
+    <p style="margin: 20px 0; color: #999; font-size: 14px;">
+        This action will mark the entry as deleted. It will no longer be visible to anyone except administrators.
+    </p>
+    
+    <form method="post">
+        {% csrf_token %}
+        <button type="submit" style="background-color: #f44336;">Yes, Delete Entry</button>
+        
+        <div class="link">
+            <a href="{% url 'entries:view_entry' entry.id %}">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

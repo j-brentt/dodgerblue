@@ -5,10 +5,17 @@ from . import views
 app_name = 'authors'
 
 urlpatterns = [
+    # Root as login page
+    path('', auth_views.LoginView.as_view(template_name='authors/login.html'), name='login'), 
+    
     # Authentication
-    path('login/', auth_views.LoginView.as_view(template_name='authors/login.html'), name='login'),
+    path('login/', auth_views.LoginView.as_view(template_name='authors/login.html'), name='login'), 
     path('logout/', auth_views.LogoutView.as_view(next_page='authors:login'), name='logout'),
     path('signup/', views.signup, name='signup'),
-    # Profile
+
+    # Profile management
     path('<str:author_id>/edit/', views.profile_edit, name='profile_edit'),
+
+    # Main app pages (requires login)
+    path('stream/', views.stream, name='stream'),
 ]

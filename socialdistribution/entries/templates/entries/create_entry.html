@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+
+{% block title %}Create Entry - Social Distribution{% endblock %}
+
+{% block content %}
+<style>
+    .container { max-width: 800px; }
+    textarea {
+        width: 100%;
+        padding: 12px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-size: 14px;
+        font-family: inherit;
+        resize: vertical;
+    }
+    textarea:focus {
+        outline: none;
+        border-color: #1E90FF;
+    }
+    select {
+        width: 100%;
+        padding: 12px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-size: 14px;
+        background-color: white;
+    }
+    select:focus {
+        outline: none;
+        border-color: #1E90FF;
+    }
+</style>
+
+<div class="card">
+    <h2>Create New Entry</h2>
+    
+    <form method="post">
+        {% csrf_token %}
+        
+        {% for field in form %}
+            <div class="form-group">
+                <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                {{ field }}
+                {% if field.help_text %}
+                    <small style="display: block; margin-top: 5px; color: #666; font-size: 12px;">
+                        {{ field.help_text }}
+                    </small>
+                {% endif %}
+                {% if field.errors %}
+                    <div style="color: #c62828; font-size: 12px; margin-top: 5px;">
+                        {% for error in field.errors %}
+                            {{ error }}
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            </div>
+        {% endfor %}
+        
+        <button type="submit">Create Entry</button>
+        
+        <div class="link">
+            <a href="{% url 'authors:stream' %}">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

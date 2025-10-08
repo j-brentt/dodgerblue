@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+
+{% block title %}{{ entry.title }} - Social Distribution{% endblock %}
+
+{% block content %}
+<style>
+    .container { max-width: 800px; }
+    .entry-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: start;
+        margin-bottom: 20px;
+    }
+    .entry-meta {
+        color: #666;
+        font-size: 14px;
+        margin-bottom: 10px;
+    }
+    .entry-content {
+        margin-top: 20px;
+        padding-top: 20px;
+        border-top: 1px solid #eee;
+        white-space: pre-wrap;
+        line-height: 1.8;
+    }
+    .entry-actions {
+        display: flex;
+        gap: 10px;
+        margin-top: 20px;
+    }
+    .entry-actions a, .entry-actions button {
+        padding: 10px 20px;
+        border-radius: 4px;
+        text-decoration: none;
+        font-size: 14px;
+        cursor: pointer;
+    }
+    .btn-edit {
+        background-color: #1E90FF;
+        color: white;
+    }
+    .btn-edit:hover {
+        background-color: #187bcd;
+    }
+    .btn-delete {
+        background-color: #f44336;
+        color: white;
+        border: none;
+    }
+    .btn-delete:hover {
+        background-color: #da190b;
+    }
+    .btn-back {
+        background-color: #f5f5f5;
+        color: #333;
+    }
+    .btn-back:hover {
+        background-color: #e0e0e0;
+    }
+    .visibility-badge {
+        display: inline-block;
+        padding: 4px 12px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 500;
+    }
+    .badge-public { background-color: #e8f5e9; color: #2e7d32; }
+    .badge-friends { background-color: #fff3e0; color: #e65100; }
+    .badge-unlisted { background-color: #e3f2fd; color: #1565c0; }
+</style>
+
+<div class="card">
+    <div class="entry-header">
+        <div>
+            <h2>{{ entry.title }}</h2>
+            <div class="entry-meta">
+                By {{ entry.author.display_name }} • 
+                {{ entry.published|date:"F d, Y" }}
+                {% if entry.visibility == 'PUBLIC' %}
+                    <span class="visibility-badge badge-public">Public</span>
+                {% elif entry.visibility == 'FRIENDS' %}
+                    <span class="visibility-badge badge-friends">Friends Only</span>
+                {% elif entry.visibility == 'UNLISTED' %}
+                    <span class="visibility-badge badge-unlisted">Unlisted</span>
+                {% endif %}
+            </div>
+            {% if entry.description %}
+                <p style="color: #666; margin-top: 10px;">{{ entry.description }}</p>
+            {% endif %}
+        </div>
+    </div>
+    
+    <div class="entry-content">
+        {{ entry.content }}
+    </div>
+    
+    {% if request.user.id == entry.author.id %}
+        <div class="entry-actions">
+            <a href="{% url 'entries:edit_entry' entry.id %}" class="btn-edit">Edit</a>
+            <form method="get" action="{% url 'entries:delete_entry' entry.id %}" style="display: inline;">
+                <button type="submit" class="btn-delete">Delete</button>
+            </form>
+            <a href="{% url 'authors:stream' %}" class="btn-back">Back to Stream</a>
+        </div>
+    {% else %}
+        <div class="entry-actions">
+            <a href="{% url 'authors:stream' %}" class="btn-back">Back to Stream</a>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

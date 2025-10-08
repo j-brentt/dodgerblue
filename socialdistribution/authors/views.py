@@ -2,6 +2,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from .models import Author
+from entries.models import Entry
 from .form import ProfileEditForm
 
 def signup(request):
@@ -54,7 +55,7 @@ def profile_edit(request, author_id):
     # Since Author extends AbstractUser, request.user IS the author
     if request.user.id != author.id:
         messages.error(request, "You can only edit your own profile.")
-        return redirect('authors:login', author_id=author.id) # CHANGE redirect once we have a profile page
+        return redirect('authors:stream')
     
     if request.method == 'POST':
         form = ProfileEditForm(request.POST)
@@ -66,7 +67,7 @@ def profile_edit(request, author_id):
             author.save()
             
             messages.success(request, "Your profile has been updated successfully!")
-            return redirect('authors:login', author_id=author.id) #CHANGE LATER
+            return redirect('authors:stream') 
         else:
             messages.error(request, "Please correct the errors below.")
     else:
@@ -82,3 +83,23 @@ def profile_edit(request, author_id):
         'form': form
     }
     return render(request, 'authors/profile_edit.html', context)
+
+@login_required
+def stream(request):
+    """
+    Display the main feed/stream for the logged-in author.
+    
+    
+    **currently a place holder, need to add entry logic**
+    """
+    author = request.user  
+    
+    entries = Entry.objects.filter(visibility='PUBLIC').exclude(visibility='DELETED')
+    
+    context = {
+        'author': author,
+        'entries': entries, 
+    }
+    
+    return render(request, 'authors/stream.html', context)
+

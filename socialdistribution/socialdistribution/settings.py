@@ -31,6 +31,7 @@ ALLOWED_HOSTS = []
 # Application definition
 
 INSTALLED_APPS = [
+    'entries',
     'authors',
     'django.contrib.admin',
     'django.contrib.auth',
@@ -124,6 +125,6 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 AUTH_USER_MODEL = 'authors.Author'
 
-LOGIN_REDIRECT_URL = '/'
+LOGIN_REDIRECT_URL = '/stream/'
 LOGOUT_REDIRECT_URL = '/login/'
 LOGIN_URL = '/login/'
