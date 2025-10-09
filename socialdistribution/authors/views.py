@@ -3,7 +3,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from .models import Author
 from entries.models import Entry
-from .form import ProfileEditForm
+from .forms import ProfileEditForm
 
 def signup(request):
     """Handle user registration"""

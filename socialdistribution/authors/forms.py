@@ -1,5 +1,13 @@
 from django import forms
 from .models import Author
+from django.contrib.auth.forms import AuthenticationForm
+from django.core.exceptions import ValidationError
+
+class CustomAuthenticationForm(AuthenticationForm):
+    """Custom login form that blocks unapproved users"""
+    def confirm_login_allowed(self, user):
+        if not user.is_approved:
+            raise ValidationError("Your account is awaiting admin approval.", code='inactive')
 
 class ProfileEditForm(forms.Form):
     """Form for editing author profile information"""
