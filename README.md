@@ -19,3 +19,4 @@ MIT [License](LICENSE)
 - Titobiloluwa Adeniji
 - Zhikun Liu
 - Botsian Liu
+- Syed Shahmeer Rahman
