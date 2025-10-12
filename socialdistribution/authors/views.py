@@ -1,8 +1,9 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
+from django.db.models import Q 
 from .models import Author
-from entries.models import Entry
+from entries.models import Entry, Visibility
 from .forms import ProfileEditForm
 
 def signup(request):
@@ -87,15 +88,17 @@ def profile_edit(request, author_id):
 @login_required
 def stream(request):
     """
-    Display the main feed/stream for the logged-in author.
-    
-    
-    **currently a place holder, need to add entry logic**
+    Display the main feed/stream for the logged-in author.    
     """
     author = request.user  
-    
-    entries = Entry.objects.filter(visibility='PUBLIC').exclude(visibility='DELETED')
-    
+    entries = (
+        Entry.objects
+        .filter(
+            Q(visibility=Visibility.PUBLIC) | Q(author=author)
+        )
+        .select_related("author")
+        .order_by("-published")
+    )
     context = {
         'author': author,
         'entries': entries, 

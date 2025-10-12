@@ -1,9 +1,29 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from .models import Entry
+from django.views.generic import ListView, DetailView
+from django.core.exceptions import PermissionDenied
+from django.http import Http404
+from .models import Entry, Visibility
 from .forms import EntryForm
 import uuid
+
+class PublicEntriesListView(ListView):
+    model = Entry
+    template_name = "entries/view_entry.html"  # consider making a list template, e.g., entries/public_list.html
+    context_object_name = "entries"
+
+    def get_template_names(self):
+        # Prefer a list template if you have one
+        return ["entries/public_list.html"] if self.request else [self.template_name]
+
+    def get_queryset(self):
+        return (
+            Entry.objects
+            .filter(visibility=Visibility.PUBLIC)
+            .select_related("author")
+            .order_by("-id")
+        )
 
 @login_required
 def create_entry(request):
@@ -113,32 +133,33 @@ def delete_entry(request, entry_id):
     return render(request, 'entries/delete_entry.html', context)
 
 
-@login_required
+# @login_required  - removing this for now as public entries need to be viewable by all users (i.e. anonymous too)
 def view_entry(request, entry_id):
-    """View a single entry"""
+    """View a single entry by UUID with visibility enforcement."""
     # Convert string ID to UUID
     try:
-        entry_id_uuid = uuid.UUID(entry_id)
-    except ValueError:
-        messages.error(request, "Invalid entry ID.")
-        return redirect('authors:stream')
-    
-    entry = get_object_or_404(Entry, id=entry_id_uuid)
-    
-    # Check if user has permission to view this entry
-    if entry.visibility == 'DELETED':
-        # Only admins can see deleted entries
-        if not request.user.is_staff:
-            messages.error(request, "This entry has been deleted.")
-            return redirect('authors:stream')
-    elif entry.visibility == 'FRIENDS':
-        # TODO: Add a friends check when following/friends is implemented
-        # For now, only author can see friends-only entries
-        if request.user.id != entry.author.id:
-            messages.error(request, "You don't have permission to view this entry.")
-            return redirect('authors:stream')
-    # PUBLIC and UNLISTED can be viewed by anyone (if they have the link)
-    
-    context = {'entry': entry}
-    return render(request, 'entries/view_entry.html', context)
+        entry_uuid = uuid.UUID(str(entry_id))
+    except (ValueError, TypeError):
+        raise Http404("Invalid entry ID")
+
+    entry = get_object_or_404(Entry, id=entry_uuid)
+
+    # Deleted entries hidden from non-staff
+    if getattr(entry, "visibility", None) == "DELETED" and not request.user.is_staff:
+        raise Http404("Entry not found")
+
+    # Prefer model-level can_view if present
+    can_view_method = getattr(entry, "can_view", None)
+    if callable(can_view_method):
+        if not entry.can_view(request.user):
+            raise PermissionDenied
+    else:
+        # Fallback: PUBLIC/UNLISTED allowed; FRIENDS only author (until friends implemented)
+        if entry.visibility == "FRIENDS":
+            if not request.user.is_authenticated or request.user.id != entry.author.id:
+                raise PermissionDenied
+        # PUBLIC and UNLISTED visible to anyone
+
+    context = {"entry": entry}
+    return render(request, "entries/view_entry.html", context)
 
