@@ -125,6 +125,6 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 AUTH_USER_MODEL = 'authors.Author'
 
-LOGIN_REDIRECT_URL = '/stream/'
-LOGOUT_REDIRECT_URL = '/login/'
+LOGIN_REDIRECT_URL = 'stream'
+LOGOUT_REDIRECT_URL = 'authors:login'
 LOGIN_URL = '/login/'

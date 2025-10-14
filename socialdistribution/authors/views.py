@@ -57,7 +57,7 @@ def profile_edit(request, author_id):
     # Since Author extends AbstractUser, request.user IS the author
     if request.user.id != author.id:
         messages.error(request, "You can only edit your own profile.")
-        return redirect('authors:stream')
+        return redirect('stream')
     
     if request.method == 'POST':
         form = ProfileEditForm(request.POST)
@@ -69,7 +69,7 @@ def profile_edit(request, author_id):
             author.save()
             
             messages.success(request, "Your profile has been updated successfully!")
-            return redirect('authors:stream') 
+            return redirect('stream') 
         else:
             messages.error(request, "Please correct the errors below.")
     else:
@@ -116,7 +116,7 @@ def profile_detail(request, author_id):
         return_url = request.GET.get("next") or request.META.get("HTTP_REFERER")
         if not return_url:
                 try:
-                        return_url = reverse("authors:stream")  # Takes the user back to the previous page
+                        return_url = reverse("stream")  # Takes the user back to the previous page
                 except NoReverseMatch:
                         return_url = "/"
         context = {"profile_author":author, "entries":entries,}
