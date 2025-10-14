@@ -1,8 +1,10 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
+from django.db.models import Q 
+from django.urls import reverse, NoReverseMatch
 from .models import Author
-from entries.models import Entry
+from entries.models import Entry, Visibility
 from .forms import ProfileEditForm
 
 def signup(request):
@@ -87,15 +89,17 @@ def profile_edit(request, author_id):
 @login_required
 def stream(request):
     """
-    Display the main feed/stream for the logged-in author.
-    
-    
-    **currently a place holder, need to add entry logic**
+    Display the main feed/stream for the logged-in author.    
     """
     author = request.user  
-    
-    entries = Entry.objects.filter(visibility='PUBLIC').exclude(visibility='DELETED')
-    
+    entries = (
+        Entry.objects
+        .filter(
+            Q(visibility=Visibility.PUBLIC) | Q(author=author)
+        )
+        .select_related("author")
+        .order_by("-published")
+    )
     context = {
         'author': author,
         'entries': entries, 
@@ -103,3 +107,17 @@ def stream(request):
     
     return render(request, 'authors/stream.html', context)
 
+# Contains the info for a users profile page
+def profile_detail(request, author_id):
+        author = get_object_or_404(Author, id=author_id)
+        entries = (author.entries.filter(visibility = Visibility.PUBLIC)  # Contains the entries of an author (public ones)
+                   .select_related("author")
+                   .order_by("-published"))
+        return_url = request.GET.get("next") or request.META.get("HTTP_REFERER")
+        if not return_url:
+                try:
+                        return_url = reverse("authors:stream")  # Takes the user back to the previous page
+                except NoReverseMatch:
+                        return_url = "/"
+        context = {"profile_author":author, "entries":entries,}
+        return render(request, "authors/profile_detail.html", context)

@@ -75,6 +75,7 @@
     </div>
     <div class="nav-links">
         <a href="{% url 'entries:create_entry' %}" style="background-color: #1E90FF; color: white; padding: 8px 16px; border-radius: 4px;">+ New Entry</a>
+        <a href="{{ author.get_absolute_url }}">View Profile</a>
         <a href="{% url 'entries:my_entries'  %}">My Entries</a> 
         <a href="{% url 'authors:profile_edit' author.id %}">Edit Profile</a>
         <!-- From the prompt and the previous logout link format: Why does the logout link not redirect to login? 

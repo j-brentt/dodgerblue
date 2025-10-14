@@ -1,7 +1,7 @@
 from django import forms
-from .models import Entry
+from .models import Entry, Visibility
 
-class EntryForm(forms.Form):
+class EntryForm(forms.ModelForm):
     """Form for creating and editing entries"""
     
     title = forms.CharField(
@@ -42,3 +42,11 @@ class EntryForm(forms.Form):
         initial='PUBLIC',
         label='Visibility'
     )
+
+    class Meta:
+        model = Entry
+        fields = ["title", "description", "content", "content_type", "visibility"]
+        widgets = {
+            # Optional: ensure a select widget (uses your choices above)
+            "visibility": forms.Select(choices=Entry.VISIBILITY_CHOICES),
+        }

@@ -1,5 +1,6 @@
 from django.db import models
 from  django.contrib.auth.models import AbstractUser
+from django.urls import reverse
 import uuid
 
 class Author(AbstractUser):
@@ -16,4 +17,8 @@ class Author(AbstractUser):
     
     # Admin approval for sign-ups
     is_approved = models.BooleanField(default=False, help_text="Admin has approved this user")
+
+    # URL to author's profile - remains unique across the app
+    def get_absolute_url(self):
+        return reverse("authors:profile_detail", args=[self.id])
     
