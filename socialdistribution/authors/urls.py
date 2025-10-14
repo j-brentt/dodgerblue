@@ -14,6 +14,7 @@ urlpatterns = [
     path('signup/', views.signup, name='signup'),
 
     # Profile management
+    path('profile/<uuid:author_id>/', views.profile_detail, name='profile_detail'),
     path('<str:author_id>/edit/', views.profile_edit, name='profile_edit'),
 
     # Main app pages (requires login)
