@@ -1,20 +1,14 @@
 from django import forms
 from .models import Entry, Visibility
 
-class EntryForm(forms.ModelForm):
+class EntryForm(forms.Form):
     """Form for creating and editing entries"""
-    VISIBILITY_CHOICES = [
-        ('PUBLIC', 'Public'),
-        ('FRIENDS', 'Friends Only'),
-        ('UNLISTED', 'Unlisted'),
-    ]
+    
     title = forms.CharField(
         max_length=200,
         required=True,
         label='Title',
-        widget=forms.TextInput(attrs={
-            'placeholder': 'Entry title'
-        })
+        widget=forms.TextInput(attrs={'placeholder': 'Entry title'})
     )
     
     description = forms.CharField(
@@ -42,14 +36,11 @@ class EntryForm(forms.ModelForm):
     )
     
     visibility = forms.ChoiceField(
-        choices=VISIBILITY_CHOICES,
+        choices=[
+            ('PUBLIC', 'Public'),
+            ('FRIENDS', 'Friends Only'),
+            ('UNLISTED', 'Unlisted'),
+        ],
         initial='PUBLIC',
         label='Visibility'
     )
-
-    class Meta:
-        model = Entry
-        fields = ["title", "description", "content", "content_type", "visibility"]
-        widgets = {
-            "visibility": forms.Select(choices=Entry.VISIBILITY_CHOICES),
-        }
