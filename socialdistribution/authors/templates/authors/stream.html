@@ -89,47 +89,53 @@
 </div>
 <h3 class="sub-header">Your Stream</h3>
 {% for entry in entries %}
-    <div class="card" style="margin-bottom: 20px;">
-        <!-- Entry header with author info -->
-        <div style="display: flex; align-items: center; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid #eee;">
-            <div style="flex-grow: 1;">
-                <div style="font-weight: 500; color: #333; margin-bottom: 3px;">
-                    {{ entry.author.display_name }}
+    {% if entry.visibility != "DELETED" %}
+        <div class="card" style="margin-bottom: 20px;">
+            <!-- Entry header with author info -->
+            <div style="display: flex; align-items: center; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid #eee;">
+                <div style="flex-grow: 1;">
+                    <div style="font-weight: 500; color: #333; margin-bottom: 3px;">
+                        {{ entry.author.display_name }}
+                    </div>
+                    <div style="color: #999; font-size: 13px;">
+                        {{ entry.published|date:"F d, Y \a\t g:i A" }}
+                    </div>
                 </div>
-                <div style="color: #999; font-size: 13px;">
-                    {{ entry.published|date:"F d, Y \a\t g:i A" }}
-                </div>
+                <span class="visibility-badge badge-{{ entry.visibility|lower }}">
+                    {{ entry.get_visibility_display }}
+                </span>
             </div>
-            <span class="visibility-badge badge-{{ entry.visibility|lower }}">
-                {{ entry.get_visibility_display }}
-            </span>
+            
+            <!-- Entry content -->
+            <h3 style="margin-bottom: 10px; font-size: 20px;">
+                <a href="{% url 'entries:view_entry' entry.id %}" style="color: #333; text-decoration: none;">
+                    {{ entry.title }}
+                </a>
+            </h3>
+            
+            {% if entry.description %}
+                <p style="color: #666; margin-bottom: 15px; font-size: 14px;">
+                    {{ entry.description }}
+                </p>
+            {% endif %}
+            
+            {% if "image" in entry.content_type %}
+                <img src="data:{{ entry.content_type }};base64,{{ entry.content }}" alt="{{ entry.title }}" style="max-width:100%; border-radius:8px; margin-bottom:15px;">
+            {% else %}
+                <p style="color: #333; white-space: pre-wrap; line-height: 1.6; margin-bottom: 15px;">
+                    {{ entry.content|truncatewords:50 }}
+                </p>
+            {% endif %}
+            
+            <!-- Entry actions -->
+            <div style="display: flex; gap: 15px; padding-top: 10px; border-top: 1px solid #eee;">
+                <a href="{% url 'entries:view_entry' entry.id %}" style="color: #1E90FF; text-decoration: none; font-size: 14px; font-weight: 500;">
+                    Read more →
+                </a>
+                <!-- TODO: Add follow button when we implement following functionality-->
+            </div>
         </div>
-        
-        <!-- Entry content -->
-        <h3 style="margin-bottom: 10px; font-size: 20px;">
-            <a href="{% url 'entries:view_entry' entry.id %}" style="color: #333; text-decoration: none;">
-                {{ entry.title }}
-            </a>
-        </h3>
-        
-        {% if entry.description %}
-            <p style="color: #666; margin-bottom: 15px; font-size: 14px;">
-                {{ entry.description }}
-            </p>
-        {% endif %}
-        
-        <p style="color: #333; white-space: pre-wrap; line-height: 1.6; margin-bottom: 15px;">
-            {{ entry.content|truncatewords:50 }}
-        </p>
-        
-        <!-- Entry actions -->
-        <div style="display: flex; gap: 15px; padding-top: 10px; border-top: 1px solid #eee;">
-            <a href="{% url 'entries:view_entry' entry.id %}" style="color: #1E90FF; text-decoration: none; font-size: 14px; font-weight: 500;">
-                Read more →
-            </a>
-            <!-- TODO: Add follow button when we implement following functionality-->
-        </div>
-    </div>
+    {% endif %}
 {% empty %}
     <div class="card">
         <div class="empty-state">

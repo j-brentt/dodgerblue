@@ -6,12 +6,6 @@ from django.http import Http404
 from django.db.models import Q
 from .models import Entry, Visibility
 from .serializers import EntrySerializer
-from rest_framework.pagination import PageNumberPagination
-
-class PublicEntriesPagination(PageNumberPagination):
-    page_size = 10
-    page_size_query_param = 'page_size'
-    max_page_size = 100
 
 class PublicEntriesListView(generics.ListAPIView):
     serializer_class = EntrySerializer

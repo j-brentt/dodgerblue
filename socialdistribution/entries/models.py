@@ -23,8 +23,8 @@ class Entry(models.Model):
     CONTENT_TYPE_CHOICES = [
         ('text/plain', 'Plain Text'),
        # ('text/markdown', 'Markdown'), 
-        #('image/png;base64', 'PNG Image'),
-       # ('image/jpeg;base64', 'JPEG Image'),
+        ('image/png;base64', 'PNG Image'),
+        ('image/jpeg;base64', 'JPEG Image'),
     ]
     
     # Primary key

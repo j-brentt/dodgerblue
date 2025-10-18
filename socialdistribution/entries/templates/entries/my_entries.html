@@ -40,11 +40,8 @@
     .btn-delete:hover { background-color: #da190b; }
     .btn-view { background-color: #f5f5f5; color: #333; }
     .btn-view:hover { background-color: #e0e0e0; }
-    .btn-back {
-        background-color: #f5f5f5;
-        color: #333;
-        background-color: #fff
-    }
+    .btn-back { background-color: #f5f5f5;}
+    .btn-back:hover {text-decoration:underline; }
     .visibility-badge {
         display: inline-block;
         padding: 4px 12px;
@@ -72,7 +69,7 @@
 </style>
 <div class="header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
     <h2>Your Entries</h2>
-    <a href="{% url 'authors:stream' %}" class="btn-back">Back to Stream</a>
+    <a href="{% url 'stream' %}" class="nav-links">Back to Stream</a>
 </div>
 <div class="container"> 
     {% if entries %}
@@ -91,9 +88,6 @@
                             <span class="visibility-badge badge-unlisted">Unlisted</span>
                         {% endif %}
                     </div>
-                    {% if entry.description %}
-                        <p style="color: #666; margin-top: 5px;">{{ entry.description }}</p>
-                    {% endif %}
                 </div>
             </div>
             

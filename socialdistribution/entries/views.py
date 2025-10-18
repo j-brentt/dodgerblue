@@ -7,6 +7,7 @@ from django.http import Http404
 from .models import Entry, Visibility
 from .forms import EntryForm
 import uuid
+import base64
 
 class PublicEntriesListView(ListView):
     model = Entry
@@ -22,21 +23,31 @@ class PublicEntriesListView(ListView):
             Entry.objects
             .filter(visibility=Visibility.PUBLIC)
             .select_related("author")
-            .order_by("-id")
+            .order_by("-published")
         )
 
 @login_required
 def create_entry(request):
     """Create a new entry"""
     if request.method == 'POST':
-        form = EntryForm(request.POST)
+        form = EntryForm(request.POST, request.FILES)
         if form.is_valid():
+            content_type = form.cleaned_data['content_type']
+            # Handle image entries
+            if content_type in ['image/png;base64', 'image/jpeg;base64']:
+                image_file = form.cleaned_data['image']
+                # Convert image to base64
+                image_data = base64.b64encode(image_file.read()).decode('utf-8')
+                content = image_data
+            else:
+                # Handle text entries
+                content = form.cleaned_data['content']
             # Create the entry
             entry = Entry.objects.create(
                 author=request.user,
                 title=form.cleaned_data['title'],
                 description=form.cleaned_data['description'],
-                content=form.cleaned_data['content'],
+                content=content,
                 content_type=form.cleaned_data['content_type'],
                 visibility=form.cleaned_data['visibility']
             )
@@ -54,9 +65,8 @@ def create_entry(request):
 @login_required
 def edit_entry(request, entry_id):
     """Edit an existing entry"""
-    # Convert string ID to UUID
     try:
-        entry_id_uuid = uuid.UUID(entry_id)
+        entry_id_uuid = entry_id
     except ValueError:
         messages.error(request, "Invalid entry ID.")
         return redirect('authors:stream')
@@ -94,7 +104,6 @@ def edit_entry(request, entry_id):
             'title': entry.title,
             'description': entry.description,
             'content': entry.content,
-            'content_type': entry.content_type,
             'visibility': entry.visibility,
         })
     
@@ -110,7 +119,7 @@ def delete_entry(request, entry_id):
     """Delete an entry (mark as DELETED)"""
     # Convert string ID to UUID
     try:
-        entry_id_uuid = uuid.UUID(entry_id)
+        entry_id_uuid = entry_id
     except ValueError:
         messages.error(request, "Invalid entry ID.")
         return redirect('authors:stream')
@@ -165,6 +174,6 @@ def view_entry(request, entry_id):
 @login_required
 def my_entries(request):
     """List all of the users entires"""
-    entries = Entry.objects.filter(author=request.user).exclude(visibility='DELETED').order_by('-id')
+    entries = Entry.objects.filter(author=request.user).exclude(visibility='DELETED').order_by('-published')
     context = {'entries': entries}
     return render(request, 'entries/my_entries.html', context)

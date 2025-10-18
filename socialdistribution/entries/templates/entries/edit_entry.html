@@ -34,34 +34,50 @@
 
 <div class="card">
     <h2>Edit Entry</h2>
-    
-    <form method="post">
+    <form method="post" enctype="multipart/form-data">
         {% csrf_token %}
         
-        {% for field in form %}
-            <div class="form-group">
-                <label for="{{ field.id_for_label }}">{{ field.label }}</label>
-                {{ field }}
-                {% if field.help_text %}
-                    <small style="display: block; margin-top: 5px; color: #666; font-size: 12px;">
-                        {{ field.help_text }}
-                    </small>
-                {% endif %}
-                {% if field.errors %}
-                    <div style="color: #c62828; font-size: 12px; margin-top: 5px;">
-                        {% for error in field.errors %}
-                            {{ error }}
-                        {% endfor %}
-                    </div>
-                {% endif %}
-            </div>
-        {% endfor %}
+        <div class="form-group">
+            <label for="id_title">Title</label>
+            <input type="text" name="title" id="id_title" value="{{ entry.title }}" required>
+        </div>
+        
+        <div class="form-group">
+            <label for="id_description">Description</label>
+            <textarea name="description" id="id_description" rows="3">{{ entry.description }}</textarea>
+        </div>
+        
+
+        {% if entry.content_type == "text/plain" %}
+        <div class="form-group">
+            <label for="id_content">Content</label>
+            <textarea name="content" id="id_content" rows="10">{{ entry.content }}</textarea>
+        </div>
+        {% else %}
+        <div class="form-group">
+            <label>Current Image</label><br>
+            <img src="data:{{ entry.content_type }};base64,{{ entry.content }}" alt="Entry Image" style="max-width:100%; margin-bottom:10px;">
+        </div>
+        <div class="form-group">
+            <label for="image-upload">Upload New Image</label>
+            <input type="file" name="image" id="image-upload" accept="image/png,image/jpeg,image/jpg">
+        </div>
+        {% endif %}
+
+        <div class="form-group">
+            <label for="id_visibility">Visibility</label>
+            <select id="id_visibility" name="visibility">
+                <option value="PUBLIC" {% if entry.visibility == "PUBLIC" %}selected{% endif %}>Public</option>
+                <option value="FRIENDS" {% if entry.visibility == "FRIENDS" %}selected{% endif %}>Friends Only</option>
+                <option value="UNLISTED" {% if entry.visibility == "UNLISTED" %}selected{% endif %}>Unlisted</option>
+            </select>
+        </div>
         
         <button type="submit">Save Changes</button>
-        
         <div class="link">
             <a href="{% url 'entries:view_entry' entry.id %}">Cancel</a>
         </div>
     </form>
 </div>
+
 {% endblock %}
