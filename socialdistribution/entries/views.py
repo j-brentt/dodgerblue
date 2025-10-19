@@ -64,55 +64,58 @@ def create_entry(request):
 
 @login_required
 def edit_entry(request, entry_id):
-    """Edit an existing entry"""
-    try:
-        entry_id_uuid = entry_id
-    except ValueError:
-        messages.error(request, "Invalid entry ID.")
-        return redirect('authors:stream')
-    
-    entry = get_object_or_404(Entry, id=entry_id_uuid)
-    
-    
-    if request.user.id != entry.author.id:
+    entry = get_object_or_404(Entry, id=entry_id)
+    # Cannot view others entires
+    if request.user != entry.author:
         messages.error(request, "You can only edit your own entries.")
         return redirect('authors:stream')
-    
     # Cannot edit deleted entries
     if entry.visibility == 'DELETED':
         messages.error(request, "Cannot edit deleted entries.")
         return redirect('authors:stream')
     
     if request.method == 'POST':
-        form = EntryForm(request.POST)
+        #  When submitting the form, we pass request.FILES for file uploads (images)
+        # Also set 'initial' here to provide the existing content to the form,
+        form = EntryForm(request.POST, request.FILES, initial={'content': entry.content, 'is_new': False})
         if form.is_valid():
-            # Update the entry
+            content_type = form.cleaned_data['content_type']
+             # Handles images separately
+            if content_type in ['image/png;base64', 'image/jpeg;base64']:
+                image_file = form.cleaned_data.get('image')
+                # Converts and stores uploaded images to base64
+                if image_file:
+                    import base64
+                    entry.content = base64.b64encode(image_file.read()).decode('utf-8')
+                    entry.content_type = f"{image_file.content_type};base64"
+            else:
+                # Simply saves the text content
+                entry.content = form.cleaned_data['content']
+                entry.content_type = content_type
+
             entry.title = form.cleaned_data['title']
             entry.description = form.cleaned_data['description']
-            entry.content = form.cleaned_data['content']
-            entry.content_type = form.cleaned_data['content_type']
             entry.visibility = form.cleaned_data['visibility']
             entry.save()
-            
+
             messages.success(request, 'Entry updated successfully!')
+            # Go to entry view page after editiing
             return redirect('entries:view_entry', entry_id=entry.id)
         else:
             messages.error(request, 'Please correct the errors below.')
     else:
-        # Pre-populate form with current entry data
+        # If GET request, pre-populate the form with current entry data
+        # For images, leave 'content' blank so the text area is empty
         form = EntryForm(initial={
             'title': entry.title,
             'description': entry.description,
-            'content': entry.content,
+            'content_type': entry.content_type,
+            'content': entry.content if entry.content_type.startswith('text') else '',
             'visibility': entry.visibility,
         })
-    
-    context = {
-        'form': form,
-        'entry': entry
-    }
-    return render(request, 'entries/edit_entry.html', context)
 
+    context = {'form': form, 'entry': entry}
+    return render(request, 'entries/edit_entry.html', context)
 
 @login_required
 def delete_entry(request, entry_id):

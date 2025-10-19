@@ -45,7 +45,14 @@
     display: inline;
     margin: 0;
     }
+    .entry-content {
+        text-align: left;
+    }
 
+    .entry-content img {
+        display: block;
+        margin: 0 0 15px 0; /* bottom spacing only */
+    }
 
 
     
@@ -106,27 +113,28 @@
                 </span>
             </div>
             
-            <!-- Entry content -->
-            <h3 style="margin-bottom: 10px; font-size: 20px;">
-                <a href="{% url 'entries:view_entry' entry.id %}" style="color: #333; text-decoration: none;">
-                    {{ entry.title }}
-                </a>
-            </h3>
+            <div class="entry-content">
+                <h3 style="margin-bottom: 10px; font-size: 20px;">
+                    <a href="{% url 'entries:view_entry' entry.id %}" style="color: #333; text-decoration: none;">
+                        {{ entry.title }}
+                    </a>
+                </h3>
             
-            {% if entry.description %}
-                <p style="color: #666; margin-bottom: 15px; font-size: 14px;">
-                    {{ entry.description }}
-                </p>
-            {% endif %}
-            
-            {% if "image" in entry.content_type %}
-                <img src="data:{{ entry.content_type }};base64,{{ entry.content }}" alt="{{ entry.title }}" style="max-width:100%; border-radius:8px; margin-bottom:15px;">
-            {% else %}
-                <p style="color: #333; white-space: pre-wrap; line-height: 1.6; margin-bottom: 15px;">
-                    {{ entry.content|truncatewords:50 }}
-                </p>
-            {% endif %}
-            
+                {% if entry.description %}
+                    <p style="color: #666; margin-bottom: 15px; font-size: 14px;">
+                        {{ entry.description }}
+                    </p>
+                {% endif %}
+                <!-- From the prompt: How do you view the image if the content type is image?
+                ChatGPT 4.5, OpenAI, 10-18-2025, https://chatgpt.com/c/68f02d9a-dea8-8324-a793-4ebc9004bc46 -->
+                {% if "image" in entry.content_type %}
+                    <img src="data:{{ entry.content_type }};base64,{{ entry.content }}" alt="{{ entry.title }}">
+                {% else %}
+                    <p>
+                        {{ entry.content|truncatewords:50 }}
+                    </p>
+                {% endif %}
+            </div>
             <!-- Entry actions -->
             <div style="display: flex; gap: 15px; padding-top: 10px; border-top: 1px solid #eee;">
                 <a href="{% url 'entries:view_entry' entry.id %}" style="color: #1E90FF; text-decoration: none; font-size: 14px; font-weight: 500;">

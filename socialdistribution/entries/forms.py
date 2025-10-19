@@ -58,20 +58,21 @@ class EntryForm(forms.Form):
 
     def clean(self):
         cleaned_data = super().clean()
-        content_type = cleaned_data.get('content_type')
-        content = cleaned_data.get('content')
-        image = cleaned_data.get('image')
+        # Only enforce required content if creating a new entry
+        if self.initial.get('is_new', True):
+            content_type = cleaned_data.get('content_type')
+            content = cleaned_data.get('content')
+            image = cleaned_data.get('image')
 
-        # Only enforce requirement if no existing content/image
-        existing_content = getattr(self.initial, 'content', None)
+            existing_content = self.initial.get('content')
 
-        if content_type and content_type.startswith('image'):
-            if not image and not existing_content:
-                raise forms.ValidationError('Please upload an image for image entries.')
-            cleaned_data['content'] = ''  # Clear text content if type is image
-        else:
-            if not content and not existing_content:
-                raise forms.ValidationError('Please provide content for text entries.')
-            cleaned_data['image'] = None  # Clear image if type is text
+            if content_type.startswith('image'):
+                if not image and not existing_content:
+                    raise forms.ValidationError('Please upload an image for image entries.')
+                cleaned_data['content'] = ''  # Clear text content if type is image
+            else:
+                if not content and not existing_content:
+                    raise forms.ValidationError('Please provide content for text entries.')
+                cleaned_data['image'] = None  # Clear image if type is text
 
         return cleaned_data
