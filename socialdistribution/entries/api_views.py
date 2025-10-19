@@ -16,7 +16,7 @@ class PublicEntriesListView(generics.ListAPIView):
                             .select_related("author")\
                             .order_by("-published")
 
-class EntryDetailView(APIView):
+class EntryDetailView(generics.RetrieveUpdateDestroyAPIView):
     """
     GET /api/entries/<uuid:entry_id>/
     Returns a single entry if visible to the requester.
@@ -83,3 +83,21 @@ class MyEntriesListView(generics.ListCreateAPIView):
             "type": "entries",
             "src": serializer.data
         })
+    
+class EntryEditDeleteView(generics.RetrieveUpdateDestroyAPIView):
+    """
+    GET / PUT / DELETE /api/entries/<uuid:entry_id>/edit/
+    Only the author can edit or delete their entry.
+    """
+    serializer_class = EntrySerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_object(self):
+        entry_id = self.kwargs.get("entry_id")
+        entry = get_object_or_404(Entry, id=entry_id, author=self.request.user)
+        
+        # Prevent editing deleted entries
+        if entry.visibility == "DELETED":
+            raise Http404("Entry not found")
+
+        return entry
