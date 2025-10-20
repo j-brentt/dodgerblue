@@ -1,0 +1,103 @@
+from rest_framework import generics, permissions
+from rest_framework.response import Response
+from rest_framework.views import APIView
+from django.shortcuts import get_object_or_404
+from django.http import Http404
+from django.db.models import Q
+from .models import Entry, Visibility
+from .serializers import EntrySerializer
+
+class PublicEntriesListView(generics.ListAPIView):
+    serializer_class = EntrySerializer
+    permission_classes = [permissions.AllowAny]
+
+    def get_queryset(self):
+        return Entry.objects.filter(visibility=Visibility.PUBLIC)\
+                            .select_related("author")\
+                            .order_by("-published")
+
+class EntryDetailView(generics.RetrieveUpdateDestroyAPIView):
+    """
+    GET /api/entries/<uuid:entry_id>/
+    Returns a single entry if visible to the requester.
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def get_object(self, entry_id):
+        """
+        Retrieves the entry object from the database and returns it unless incorrect visibility
+        """
+        entry = get_object_or_404(Entry, id=entry_id)
+        
+        # Deleted entries hidden from those who arent admin
+        if entry.visibility == "DELETED":
+            raise Http404("Entry not found")
+
+        # FRIENDS visibility (only author can see for now) #TODO: implement friends/following
+        if entry.visibility == Visibility.FRIENDS and (
+            not self.request.user.is_authenticated or entry.author != self.request.user
+        ):
+            raise Http404("Entry not found")
+
+        return entry
+
+    def get(self, request, entry_id):
+        """
+        Handles GET requests for a single entry by ID.
+        Returns the serialized entry in the response body.
+        """
+        entry = self.get_object(entry_id)
+        serializer = EntrySerializer(entry, context={"request": request})
+        return Response(serializer.data)
+
+
+class MyEntriesListView(generics.ListCreateAPIView):
+    """
+    GET /api/author/<uuid:author_id>/entries/
+    POST /api/author/<uuid:author_id>/entries/
+    """
+    serializer_class = EntrySerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        """
+        Returns list of current users entries excluding deleted entries
+        """
+        return Entry.objects.filter(author=self.request.user).exclude(visibility="DELETED").order_by("-published")
+
+    def perform_create(self, serializer):
+        """
+        Saves an entry with the current user as the author
+        Called wjen a POST request is made to the view.
+        """
+        serializer.save(author=self.request.user)
+
+    def list(self, request, *args, **kwargs):
+        """
+        Serializes queryset when GET response is received
+        Returns 200 OK response with serialized queryset as body 
+        """
+        queryset = self.get_queryset()
+        serializer = self.get_serializer(queryset, many=True, context={"request": request})
+        return Response({
+            "type": "entries",
+            "src": serializer.data
+        })
+    
+class EntryEditDeleteView(generics.RetrieveUpdateDestroyAPIView):
+    """
+    GET / PUT / DELETE /api/entries/<uuid:entry_id>/edit/
+    Only the author can edit or delete their entry.
+    """
+    serializer_class = EntrySerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_object(self):
+        entry_id = self.kwargs.get("entry_id")
+        entry = get_object_or_404(Entry, id=entry_id, author=self.request.user)
+        
+        # Prevent editing deleted entries
+        if entry.visibility == "DELETED":
+            raise Http404("Entry not found")
+
+        return entry

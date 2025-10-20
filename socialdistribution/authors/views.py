@@ -26,12 +26,12 @@ def signup(request):
             messages.error(request, 'Passwords do not match.')
             return render(request, 'authors/signup.html')
         
-        # Check if username exists
+        # Check if username exists (prevents duplicate usernames login)
         if Author.objects.filter(username=username).exists():
             messages.error(request, 'Username already exists.')
             return render(request, 'authors/signup.html')
         
-        # Create the author (not approved by default)
+        # Create the author account (requires admin approval before )
         author = Author.objects.create_user(
             username=username,
             email=email,
@@ -49,16 +49,15 @@ def signup(request):
 def profile_edit(request, author_id):
     """
     View for editing an author's profile.
-    Only the author themselves can edit their profile.
+    Only the currently logged-in author can access this page.
     ***still need to add description***
     """
     author = get_object_or_404(Author, id=author_id)
     
-    # Ensure the logged-in user can only edit their own profile
-    # Since Author extends AbstractUser, request.user IS the author
+    # Block users from editing others profile
     if request.user.id != author.id:
         messages.error(request, "You can only edit your own profile.")
-        return redirect('authors:stream')
+        return redirect('stream')
     
     if request.method == 'POST':
         form = ProfileEditForm(request.POST)
@@ -70,7 +69,7 @@ def profile_edit(request, author_id):
             author.save()
             
             messages.success(request, "Your profile has been updated successfully!")
-            return redirect('authors:stream') 
+            return redirect('stream') 
         else:
             messages.error(request, "Please correct the errors below.")
     else:
@@ -90,13 +89,21 @@ def profile_edit(request, author_id):
 @login_required
 def stream(request):
     """
-    Display the main feed/stream for the logged-in author.    
+    Show the main feed for the logged-in author.
+    Displays publuc posts and user's own posts.    
     """
-    author = request.user  
+    author = request.user 
+
+    # Get all authors that the user follows (approved only)
+    following_authors = author.follow_requests_sent.filter(
+        status=FollowRequestStatus.APPROVED
+    ).values_list("followee", flat=True) 
+
+    # Get all of the entries which are either public, posted by someone which the user follows, or posted by the user
     entries = (
         Entry.objects
         .filter(
-            Q(visibility=Visibility.PUBLIC) | Q(author=author)
+            Q(visibility=Visibility.PUBLIC) | Q(author=author) | Q(author__in=following_authors, visibility=Visibility.FRIENDS)# TODO: add friends entries to stream once following is implemented
         )
         .select_related("author")
         .order_by("-published")
@@ -122,7 +129,7 @@ def profile_detail(request, author_id):
     return_url = request.GET.get("next") or request.META.get("HTTP_REFERER")
     if not return_url:
         try:
-            return_url = reverse("authors:stream")  # Takes the user back to the previous page
+            return_url = reverse("stream")  # Takes the user back to the previous page
         except NoReverseMatch:
             return_url = "/"
 

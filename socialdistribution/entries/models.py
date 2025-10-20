@@ -9,6 +9,7 @@ User = get_user_model()
 class Visibility(models.TextChoices):
     PUBLIC = "PUBLIC", "Public"
     FRIENDS = "FRIENDS", "Friends only"
+    DELETED = "DELTED", "Deleted"
 
 class Entry(models.Model):
     """Model for blog entries/posts"""
@@ -23,8 +24,8 @@ class Entry(models.Model):
     CONTENT_TYPE_CHOICES = [
         ('text/plain', 'Plain Text'),
        # ('text/markdown', 'Markdown'), 
-        #('image/png;base64', 'PNG Image'),
-       # ('image/jpeg;base64', 'JPEG Image'),
+        ('image/png;base64', 'PNG Image'),
+        ('image/jpeg;base64', 'JPEG Image'),
     ]
     
     # Primary key

@@ -16,9 +16,13 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
+from authors import views as author_views
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('', include('authors.urls')),
-    path('', include('entries.urls'))
+    path('', author_views.stream, name='stream'),
+    path('authors/', include('authors.urls')),
+    path('entries/', include('entries.urls')),
+    path('api/', include('entries.api_urls')),
+    path('api/', include('authors.api_urls')),
 ]
