@@ -27,6 +27,10 @@
                 {% if follow_relationship %}
                     {% if follow_relationship.status == "APPROVED" %}
                     <span class="follow-state approved">You follow {{ profile_author.display_name }}.</span>
+                    <form method="post" action="{% url 'authors:unfollow_author' profile_author.id %}">
+                        {% csrf_token %}
+                        <button type="submit" class="unfollow-button">Unfollow</button>
+                    </form>
                     {% elif follow_relationship.status == "PENDING" %}
                     <span class="follow-state pending">Follow request pending approval.</span>
                     {% elif follow_relationship.status == "REJECTED" %}
@@ -153,6 +157,18 @@
     }
     .follow-button:hover {
         background-color: #187bcd;
+    }
+    .unfollow-button {
+        padding: 8px 16px;
+        background-color: #c62828;
+        color: #fff;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-weight: 500;
+    }
+    .unfollow-button:hover {
+        background-color: #8e0000;
     }
     .follow-state {
         font-size: 14px;

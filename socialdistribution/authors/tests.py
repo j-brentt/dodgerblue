@@ -100,3 +100,19 @@ class FollowRequestViewTests(TestCase):
         self.assertRedirects(response, reverse("authors:follow_requests"))
         follow_request.refresh_from_db()
         self.assertEqual(follow_request.status, FollowRequestStatus.REJECTED)
+
+    def test_follower_can_unfollow_after_approval(self):
+        FollowRequest.objects.create(
+            follower=self.follower,
+            followee=self.followee,
+            status=FollowRequestStatus.APPROVED,
+        )
+        self.client.force_login(self.follower)
+        url = reverse("authors:unfollow_author", args=[self.followee.id])
+
+        response = self.client.post(url)
+
+        self.assertRedirects(response, self.followee.get_absolute_url())
+        self.assertFalse(
+            FollowRequest.objects.filter(follower=self.follower, followee=self.followee).exists()
+        )

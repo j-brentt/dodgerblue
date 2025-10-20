@@ -184,6 +184,23 @@ def send_follow_request(request, author_id):
 
 
 @login_required
+def unfollow_author(request, author_id):
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+
+    followee = get_object_or_404(Author, id=author_id)
+    follow_request = get_object_or_404(
+        FollowRequest,
+        follower=request.user,
+        followee=followee,
+        status=FollowRequestStatus.APPROVED,
+    )
+    follow_request.delete()
+    messages.info(request, f"You unfollowed {followee.display_name}.")
+    return redirect(followee.get_absolute_url())
+
+
+@login_required
 def follow_requests(request):
     incoming_pending = (
         request.user.follow_requests_received.filter(status=FollowRequestStatus.PENDING)
