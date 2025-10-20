@@ -6,7 +6,7 @@
 <style>
     /* Override container width for stream - make it wider */
     .container {
-        max-width: 800px;
+        max-width: 1000px;
     }
     
     .header {
@@ -83,6 +83,7 @@
     <div class="nav-links">
         <a href="{% url 'entries:create_entry' %}" style="background-color: #1E90FF; color: white; padding: 8px 16px; border-radius: 4px;">+ New Entry</a>
         <a href="{{ author.get_absolute_url }}">View Profile</a>
+        <a href="{% url 'authors:follow_requests' %}">Follow Requests{% if pending_follow_requests_count %} ({{ pending_follow_requests_count }}){% endif %}</a>
         <a href="{% url 'entries:my_entries'  %}">My Entries</a> 
         <!-- From the prompt and the previous logout link format: Why does the logout link not redirect to login? 
         ChatGPT 4.5, OpenAI, 2025-10-09,https://chatgpt.com/c/68e7e183-3464-8321-9632-2877858f6937-->
@@ -102,7 +103,9 @@
             <div style="display: flex; align-items: center; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid #eee;">
                 <div style="flex-grow: 1;">
                     <div style="font-weight: 500; color: #333; margin-bottom: 3px;">
-                        {{ entry.author.display_name }}
+                        <a href="{% url 'authors:profile_detail' entry.author.id %}" style="color: #1E90FF; text-decoration: none;">
+                            {{ entry.author.display_name }}
+                        </a>
                     </div>
                     <div style="color: #999; font-size: 13px;">
                         {{ entry.published|date:"F d, Y \a\t g:i A" }}
