@@ -1,7 +1,7 @@
 from django.db import models
 from django.contrib.auth import get_user_model
 
-from authors.models import Author
+from authors.models import Author, FollowRequest, FollowRequestStatus
 import uuid
 
 User = get_user_model()
@@ -50,35 +50,52 @@ class Entry(models.Model):
         choices=Visibility.choices,
         default=Visibility.PUBLIC,
     )
-
-    # Permissions
+    
     def can_view(self, user) -> bool:
-        # Public is visible to all (including anonymous)
+        """
+        Returns True if the given user can view this entry.
+        Anyone can view public, no one can view deleted, friends only means both follow eachother
+        TODO: Utilize more in next iteration
+        """
+        # Public entries are always visible
         if self.visibility == Visibility.PUBLIC:
             return True
 
-        # Friends-only: owner can see
-        if user and user.is_authenticated:
-            if user == self.author:
-                return True
-            # Try to resolve the author's Author record from the user
-            viewer_author = getattr(user, "author", None)
-            if viewer_author is not None:
-                if viewer_author == self.author:
-                    return True
+        # Deleted entries are never visible
+        if self.visibility == Visibility.DELETED:
+            return False
 
-                # Support either an Author.is_friends_with(other) helper
-                # or a ManyToMany named `friends` on Author, if it exists.
-                if hasattr(self.author, "is_friends_with"):
-                    return self.author.is_friends_with(viewer_author)
-                if hasattr(self.author, "friends"):
-                    try:
-                        return self.author.friends.filter(pk=viewer_author.pk).exists()
-                    except Exception:
-                        pass
+        # Must be authenticated for FRIENDS entries
+        if not user or not user.is_authenticated:
+            return False
 
+        # Author can always view
+        if user == self.author:
+            return True
+        viewer_author = user 
+
+        # Only check mutual following for FRIENDS visibility
+        if self.visibility == Visibility.FRIENDS:
+            # Viewer follows author
+            viewer_follows_author = FollowRequest.objects.filter(
+                follower=viewer_author,
+                followee=self.author,
+                status=FollowRequestStatus.APPROVED
+            ).exists()
+
+            # Author follows viewer
+            author_follows_viewer = FollowRequest.objects.filter(
+                follower=self.author,
+                followee=viewer_author,
+                status=FollowRequestStatus.APPROVED
+            ).exists()
+
+            return viewer_follows_author and author_follows_viewer
+
+        # Fallback: deny access
         return False
     
+
     # Timestamps
     published = models.DateTimeField(auto_now_add=True)
     updated = models.DateTimeField(auto_now=True)

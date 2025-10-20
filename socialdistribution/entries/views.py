@@ -15,7 +15,6 @@ class PublicEntriesListView(ListView):
     context_object_name = "entries"
 
     def get_template_names(self):
-        # Prefer a list template if you have one
         return ["entries/public_list.html"] if self.request else [self.template_name]
 
     def get_queryset(self):
@@ -76,7 +75,7 @@ def edit_entry(request, entry_id):
     
     if request.method == 'POST':
         #  When submitting the form, we pass request.FILES for file uploads (images)
-        # Also set 'initial' here to provide the existing content to the form,
+        # Also set 'initial' here to provide the existing content to the form
         form = EntryForm(request.POST, request.FILES, initial={'content': entry.content, 'is_new': False})
         if form.is_valid():
             content_type = form.cleaned_data['content_type']
@@ -157,20 +156,13 @@ def view_entry(request, entry_id):
     entry = get_object_or_404(Entry, id=entry_uuid)
 
     # Deleted entries hidden from non-staff
-    if getattr(entry, "visibility", None) == "DELETED" and not request.user.is_staff:
+    if entry.visibility == "DELETED" and not request.user.is_staff:
         raise Http404("Entry not found")
 
-    # Prefer model-level can_view if present
-    can_view_method = getattr(entry, "can_view", None)
-    if callable(can_view_method):
-        if not entry.can_view(request.user):
-            raise PermissionDenied
-    else:
-        # Fallback: PUBLIC/UNLISTED allowed; FRIENDS only author (until friends implemented)
-        if entry.visibility == "FRIENDS":
-            if not request.user.is_authenticated or request.user.id != entry.author.id:
-                raise PermissionDenied
-        # PUBLIC and UNLISTED visible to anyone
+    # Check if user has correct permission to view
+    if not entry.can_view(request.user):
+        raise PermissionDenied
+
     context = {"entry": entry}
     return render(request, "entries/view_entry.html", context)
 
