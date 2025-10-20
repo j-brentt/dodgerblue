@@ -69,6 +69,7 @@
         <a href="{% url 'entries:create_entry' %}" style="background-color: #1E90FF; color: white; padding: 8px 16px; border-radius: 4px;">+ New Entry</a>
         {#<a href="{% url 'authors:my_entries' %}">My Entries</a> ****ADD THIS VIEW LATER#}
         <a href="{{ author.get_absolute_url }}">View Profile</a>
+        <a href="{% url 'authors:follow_requests' %}">Follow Requests{% if pending_follow_requests_count %} ({{ pending_follow_requests_count }}){% endif %}</a>
         <a href="{% url 'authors:profile_edit' author.id %}">Edit Profile</a>
         <a href="{% url 'authors:logout' %}">Logout</a>
     </div>

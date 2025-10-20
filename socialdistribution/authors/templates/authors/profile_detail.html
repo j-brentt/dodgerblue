@@ -18,6 +18,32 @@
                 <a href="{{ profile_author.github }}" target="_blank" rel="noopener noreferrer">GitHub</a>
             </p>
             {% endif %}
+            <div class="profile-counts">
+                <span><strong>{{ followers_count }}</strong> Followers</span>
+                <span><strong>{{ following_count }}</strong> Following</span>
+            </div>
+            {% if request.user.is_authenticated and request.user != profile_author %}
+            <div class="follow-actions">
+                {% if follow_relationship %}
+                    {% if follow_relationship.status == "APPROVED" %}
+                    <span class="follow-state approved">You follow {{ profile_author.display_name }}.</span>
+                    {% elif follow_relationship.status == "PENDING" %}
+                    <span class="follow-state pending">Follow request pending approval.</span>
+                    {% elif follow_relationship.status == "REJECTED" %}
+                    <form method="post" action="{% url 'authors:send_follow_request' profile_author.id %}">
+                        {% csrf_token %}
+                        <button type="submit" class="follow-button">Request to follow again</button>
+                    </form>
+                    <p class="follow-state denied">Your previous request was denied.</p>
+                    {% endif %}
+                {% else %}
+                <form method="post" action="{% url 'authors:send_follow_request' profile_author.id %}">
+                    {% csrf_token %}
+                    <button type="submit" class="follow-button">Follow</button>
+                </form>
+                {% endif %}
+            </div>
+            {% endif %}
         </div>
     </div>
 
@@ -102,6 +128,43 @@
     .entry-date {
         font-size: 14px;
         color: #888;
+    }
+    .profile-counts {
+        display: flex;
+        gap: 16px;
+        margin-top: 8px;
+        font-size: 14px;
+        color: #444;
+    }
+    .follow-actions {
+        margin-top: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+    .follow-button {
+        padding: 8px 16px;
+        background-color: #1E90FF;
+        color: #fff;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-weight: 500;
+    }
+    .follow-button:hover {
+        background-color: #187bcd;
+    }
+    .follow-state {
+        font-size: 14px;
+    }
+    .follow-state.approved {
+        color: #2e7d32;
+    }
+    .follow-state.pending {
+        color: #ef6c00;
+    }
+    .follow-state.denied {
+        color: #c62828;
     }
     .profile-actions {
         margin-top: 20px;

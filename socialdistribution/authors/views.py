@@ -1,9 +1,10 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from django.db.models import Q 
+from django.db.models import Q
+from django.http import HttpResponseNotAllowed
 from django.urls import reverse, NoReverseMatch
-from .models import Author
+from .models import Author, FollowRequest, FollowRequestStatus
 from entries.models import Entry, Visibility
 from .forms import ProfileEditForm
 
@@ -102,22 +103,141 @@ def stream(request):
     )
     context = {
         'author': author,
-        'entries': entries, 
+        'entries': entries,
+        'pending_follow_requests_count': author.follow_requests_received.filter(
+            status=FollowRequestStatus.PENDING
+        ).count(),
     }
     
     return render(request, 'authors/stream.html', context)
 
 # Contains the info for a users profile page
 def profile_detail(request, author_id):
-        author = get_object_or_404(Author, id=author_id)
-        entries = (author.entries.filter(visibility = Visibility.PUBLIC)  # Contains the entries of an author (public ones)
-                   .select_related("author")
-                   .order_by("-published"))
-        return_url = request.GET.get("next") or request.META.get("HTTP_REFERER")
-        if not return_url:
-                try:
-                        return_url = reverse("authors:stream")  # Takes the user back to the previous page
-                except NoReverseMatch:
-                        return_url = "/"
-        context = {"profile_author":author, "entries":entries,}
-        return render(request, "authors/profile_detail.html", context)
+    profile_author = get_object_or_404(Author, id=author_id)
+    entries = (
+        profile_author.entries.filter(visibility=Visibility.PUBLIC)
+        .select_related("author")
+        .order_by("-published")
+    )
+    return_url = request.GET.get("next") or request.META.get("HTTP_REFERER")
+    if not return_url:
+        try:
+            return_url = reverse("authors:stream")  # Takes the user back to the previous page
+        except NoReverseMatch:
+            return_url = "/"
+
+    follow_relationship = None
+    if request.user.is_authenticated and request.user != profile_author:
+        follow_relationship = (
+            FollowRequest.objects.filter(follower=request.user, followee=profile_author)
+            .select_related("follower", "followee")
+            .first()
+        )
+
+    context = {
+        "profile_author": profile_author,
+        "entries": entries,
+        "return_url": return_url,
+        "follow_relationship": follow_relationship,
+        "followers_count": profile_author.follow_requests_received.filter(
+            status=FollowRequestStatus.APPROVED
+        ).count(),
+        "following_count": profile_author.follow_requests_sent.filter(
+            status=FollowRequestStatus.APPROVED
+        ).count(),
+    }
+    return render(request, "authors/profile_detail.html", context)
+
+
+@login_required
+def send_follow_request(request, author_id):
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+
+    followee = get_object_or_404(Author, id=author_id)
+
+    if followee == request.user:
+        messages.error(request, "You cannot follow yourself.")
+        return redirect(followee.get_absolute_url())
+
+    follow_request, created = FollowRequest.objects.get_or_create(
+        follower=request.user,
+        followee=followee,
+        defaults={"status": FollowRequestStatus.PENDING},
+    )
+
+    if created:
+        messages.success(request, f"Follow request sent to {followee.display_name}.")
+    else:
+        if follow_request.status == FollowRequestStatus.APPROVED:
+            messages.info(request, f"You already follow {followee.display_name}.")
+        elif follow_request.status == FollowRequestStatus.PENDING:
+            messages.info(
+                request, f"Your follow request to {followee.display_name} is pending approval."
+            )
+        else:
+            follow_request.status = FollowRequestStatus.PENDING
+            follow_request.save(update_fields=["status", "updated_at"])
+            messages.success(request, f"Follow request re-sent to {followee.display_name}.")
+
+    return redirect(followee.get_absolute_url())
+
+
+@login_required
+def follow_requests(request):
+    incoming_pending = (
+        request.user.follow_requests_received.filter(status=FollowRequestStatus.PENDING)
+        .select_related("follower")
+        .order_by("created_at")
+    )
+    incoming_recent = (
+        request.user.follow_requests_received.filter(status=FollowRequestStatus.APPROVED)
+        .select_related("follower")
+        .order_by("-updated_at")[:10]
+    )
+    outgoing_pending = (
+        request.user.follow_requests_sent.filter(status=FollowRequestStatus.PENDING)
+        .select_related("followee")
+        .order_by("created_at")
+    )
+
+    context = {
+        "incoming_pending": incoming_pending,
+        "incoming_recent": incoming_recent,
+        "outgoing_pending": outgoing_pending,
+    }
+    return render(request, "authors/follow_requests.html", context)
+
+
+@login_required
+def approve_follow_request(request, request_id):
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+
+    follow_request = get_object_or_404(
+        FollowRequest.objects.select_related("follower", "followee"),
+        id=request_id,
+        followee=request.user,
+    )
+    follow_request.approve()
+    messages.success(
+        request, f"You approved {follow_request.follower.display_name}'s follow request."
+    )
+    return redirect("authors:follow_requests")
+
+
+@login_required
+def deny_follow_request(request, request_id):
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+
+    follow_request = get_object_or_404(
+        FollowRequest.objects.select_related("follower", "followee"),
+        id=request_id,
+        followee=request.user,
+    )
+    follow_request.reject()
+    messages.info(
+        request, f"You denied {follow_request.follower.display_name}'s follow request."
+    )
+    return redirect("authors:follow_requests")

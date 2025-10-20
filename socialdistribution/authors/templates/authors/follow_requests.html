@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+{% block title %}Follow Requests{% endblock %}
+{% block content %}
+<div class="card follow-requests-card">
+    <h1>Follow Requests</h1>
+
+    <section class="request-section">
+        <h2>Pending Approvals</h2>
+        {% if incoming_pending %}
+        <ul class="request-list">
+            {% for request in incoming_pending %}
+            <li class="request-item">
+                <div>
+                    <p class="request-name">{{ request.follower.display_name }}</p>
+                    <p class="request-username">@{{ request.follower.username }}</p>
+                </div>
+                <div class="request-actions">
+                    <form method="post" action="{% url 'authors:approve_follow_request' request.id %}">
+                        {% csrf_token %}
+                        <button type="submit" class="btn-approve">Approve</button>
+                    </form>
+                    <form method="post" action="{% url 'authors:deny_follow_request' request.id %}">
+                        {% csrf_token %}
+                        <button type="submit" class="btn-deny">Deny</button>
+                    </form>
+                </div>
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <p class="request-empty">No pending follow requests right now.</p>
+        {% endif %}
+    </section>
+
+    <section class="request-section">
+        <h2>Outgoing Requests</h2>
+        {% if outgoing_pending %}
+        <ul class="request-list">
+            {% for request in outgoing_pending %}
+            <li class="request-item">
+                <div>
+                    <p class="request-name">{{ request.followee.display_name }}</p>
+                    <p class="request-username">@{{ request.followee.username }}</p>
+                    <p class="request-state">Waiting for approval</p>
+                </div>
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <p class="request-empty">You have no pending follow requests.</p>
+        {% endif %}
+    </section>
+
+    <section class="request-section">
+        <h2>Recently Approved</h2>
+        {% if incoming_recent %}
+        <ul class="request-list">
+            {% for request in incoming_recent %}
+            <li class="request-item">
+                <div>
+                    <p class="request-name">{{ request.follower.display_name }}</p>
+                    <p class="request-username">@{{ request.follower.username }}</p>
+                    <p class="request-state">Approved on {{ request.updated_at|date:"F j, Y" }}</p>
+                </div>
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <p class="request-empty">No recent approvals.</p>
+        {% endif %}
+    </section>
+
+    <div class="request-footer">
+        <a href="{% url 'authors:stream' %}" class="return-button">Back to Stream</a>
+    </div>
+</div>
+
+<style>
+    .container {
+        max-width: 800px;
+    }
+    .follow-requests-card h1 {
+        margin-bottom: 24px;
+    }
+    .request-section {
+        margin-bottom: 32px;
+    }
+    .request-section h2 {
+        font-size: 18px;
+        margin-bottom: 16px;
+        color: #1E90FF;
+    }
+    .request-list {
+        list-style: none;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+    }
+    .request-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 16px;
+        border: 1px solid #e5e5e5;
+        border-radius: 6px;
+        background: #fafafa;
+    }
+    .request-name {
+        font-weight: 600;
+        color: #333;
+    }
+    .request-username {
+        color: #777;
+        font-size: 14px;
+    }
+    .request-state {
+        margin-top: 4px;
+        font-size: 13px;
+        color: #555;
+    }
+    .request-empty {
+        color: #777;
+        font-size: 14px;
+    }
+    .request-actions {
+        display: flex;
+        gap: 10px;
+    }
+    .request-actions form {
+        display: inline;
+    }
+    .btn-approve,
+    .btn-deny {
+        padding: 8px 14px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 14px;
+    }
+    .btn-approve {
+        background-color: #2e7d32;
+        color: #fff;
+    }
+    .btn-approve:hover {
+        background-color: #1b5e20;
+    }
+    .btn-deny {
+        background-color: #c62828;
+        color: #fff;
+    }
+    .btn-deny:hover {
+        background-color: #8e0000;
+    }
+    .return-button {
+        display: inline-block;
+        padding: 10px 24px;
+        background-color: #1E90FF;
+        color: #fff;
+        text-decoration: none;
+        border-radius: 4px;
+        font-weight: 500;
+    }
+    .return-button:hover {
+        background-color: #187bcd;
+    }
+    .request-footer {
+        text-align: right;
+    }
+</style>
+{% endblock %}
