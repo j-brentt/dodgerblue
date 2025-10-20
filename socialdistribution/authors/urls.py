@@ -16,6 +16,7 @@ urlpatterns = [
     # Profile management
     path('profile/<uuid:author_id>/', views.profile_detail, name='profile_detail'),
     path('profile/<uuid:author_id>/follow/', views.send_follow_request, name='send_follow_request'),
+    path('profile/<uuid:author_id>/unfollow/', views.unfollow_author, name='unfollow_author'),
     path('<str:author_id>/edit/', views.profile_edit, name='profile_edit'),
 
     # Follow requests
