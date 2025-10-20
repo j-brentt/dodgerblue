@@ -5,13 +5,20 @@
 {% block content %}
 <style>
     .container {
-        max-width: 800px;
+        max-width: 1000px;
+        margin: 40px auto 0;
+        padding: 0 20px;
+    }
+
+    .card {
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        padding: 30px;
+        margin-bottom: 20px;
     }
 
     .entry-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: start;
         margin-bottom: 20px;
     }
 
@@ -27,6 +34,12 @@
         border-top: 1px solid #eee;
         white-space: pre-wrap;
         line-height: 1.8;
+    }
+    .entry-content img {
+        max-width: 70%;
+        height: auto;    
+        margin-bottom: 15px;
+        border-radius: 8px;
     }
 
     .entry-actions {
@@ -44,33 +57,27 @@
         cursor: pointer;
     }
 
-    .btn-edit,
-    .btn-edit:visited {
+    .btn-edit, .btn-edit:visited {
         background-color: #1E90FF;
         color: white;
     }
-
     .btn-edit:hover {
         background-color: #187bcd;
     }
 
-    .btn-delete,
-    .btn-delete:visited {
+    .btn-delete, .btn-delete:visited {
         background-color: #f44336;
         color: white;
         border: none;
     }
-
     .btn-delete:hover {
         background-color: #da190b;
     }
 
-    .btn-back,
-    .btn-back:visited {
+    .btn-back, .btn-back:visited {
         background-color: #f5f5f5;
         color: #333;
     }
-
     .btn-back:hover {
         background-color: #e0e0e0;
     }
@@ -83,67 +90,45 @@
         font-size: 12px;
         font-weight: 500;
     }
-
-    .badge-public {
-        background-color: #e8f5e9;
-        color: #2e7d32;
-    }
-
-    .badge-friends {
-        background-color: #fff3e0;
-        color: #e65100;
-    }
-
-    .badge-unlisted {
-        background-color: #e3f2fd;
-        color: #1565c0;
-    }
+    .badge-public { background-color: #e8f5e9; color: #2e7d32; }
+    .badge-friends { background-color: #fff3e0; color: #e65100; }
+    .badge-unlisted { background-color: #e3f2fd; color: #1565c0; }
 </style>
 
 <div class="card">
     <div class="entry-header">
-        <div>
-            <h2>{{ entry.title }}</h2>
-            <div class="entry-meta">
-                By {{ entry.author.display_name }} •
-                {{ entry.published|date:"F d, Y" }}
-                {% if entry.visibility == 'PUBLIC' %}
+        <h2>{{ entry.title }}</h2>
+        <div class="entry-meta">
+            By {{ entry.author.display_name }} • {{ entry.published|date:"F d, Y" }}
+            {% if entry.visibility == 'PUBLIC' %}
                 <span class="visibility-badge badge-public">Public</span>
-                {% elif entry.visibility == 'FRIENDS' %}
+            {% elif entry.visibility == 'FRIENDS' %}
                 <span class="visibility-badge badge-friends">Friends Only</span>
-                {% elif entry.visibility == 'UNLISTED' %}
+            {% elif entry.visibility == 'UNLISTED' %}
                 <span class="visibility-badge badge-unlisted">Unlisted</span>
-                {% endif %}
-            </div>
-            {% if entry.description %}
-            <p style="color: #666; margin-top: 10px;">{{ entry.description }}</p>
             {% endif %}
         </div>
+        {% if entry.description %}
+            <p style="color: #666; margin-top: 10px;">{{ entry.description }}</p>
+        {% endif %}
     </div>
 
     <div class="entry-content">
         {% if "image" in entry.content_type %}
-        <img src="data:{{ entry.content_type }};base64,{{ entry.content }}" alt="{{ entry.title }}"
-            style="max-width:100%; border-radius:8px; margin-bottom:15px;">
+            <img src="data:{{ entry.content_type }};base64,{{ entry.content }}" alt="{{ entry.title }}">
         {% else %}
-        <p style="color: #333; white-space: pre-wrap; line-height: 1.6; margin-bottom: 15px;">
-            {{ entry.content|truncatewords:50 }}
-        </p>
+            <p>{{ entry.content }}</p>
         {% endif %}
     </div>
 
-    {% if request.user.id == entry.author.id %}
     <div class="entry-actions">
-        <a href="{% url 'entries:edit_entry' entry.id %}" class="btn-edit">Edit</a>
-        <form method="get" action="{% url 'entries:delete_entry' entry.id %}" style="display:inline-block;">
-            <button type="submit" class="btn-delete" style="height: 100%;">Delete</button>
-        </form>
+        {% if request.user.id == entry.author.id %}
+            <a href="{% url 'entries:edit_entry' entry.id %}" class="btn-edit">Edit</a>
+            <form method="get" action="{% url 'entries:delete_entry' entry.id %}" style="display:inline-block;">
+                <button type="submit" class="btn-delete">Delete</button>
+            </form>
+        {% endif %}
         <a href="{% url 'stream' %}" class="btn-back">Back to Stream</a>
     </div>
-    {% else %}
-    <div class="entry-actions">
-        <a href="{% url 'stream' %}" class="btn-back">Back to Stream</a>
-    </div>
-    {% endif %}
 </div>
 {% endblock %}
