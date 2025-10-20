@@ -1,6 +1,7 @@
 <!-- Use this template to provide common structure between all templates -->
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -11,35 +12,49 @@
             padding: 0;
             box-sizing: border-box;
         }
+
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
             background-color: #f5f5f5;
             line-height: 1.6;
         }
+
+        /* ensure that font is consistent */
+        body * {
+            font-family: inherit;
+            font-size: inherit;
+        }
+
         .container {
             max-width: 500px;
             margin: 100px auto;
             padding: 20px;
         }
+
         .card {
             background: white;
             border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
             padding: 40px;
         }
-        h1, h2 {
+
+        h1,
+        h2 {
             margin-bottom: 20px;
             color: #333;
         }
+
         .form-group {
             margin-bottom: 20px;
         }
+
         label {
             display: block;
             margin-bottom: 5px;
             color: #555;
             font-weight: 500;
         }
+
         input[type="text"],
         input[type="email"],
         input[type="password"] {
@@ -49,10 +64,12 @@
             border-radius: 4px;
             font-size: 14px;
         }
+
         input:focus {
             outline: none;
             border-color: #1E90FF;
         }
+
         button {
             width: 100%;
             padding: 12px;
@@ -64,41 +81,57 @@
             cursor: pointer;
             font-weight: 500;
         }
+
         button:hover {
             background-color: #187bcd;
         }
+
         .messages {
             margin-bottom: 20px;
         }
+
         .message {
             padding: 12px;
             border-radius: 4px;
             margin-bottom: 10px;
         }
+
         .message.error {
             background-color: #ffebee;
             color: #c62828;
             border: 1px solid #ef9a9a;
         }
+
         .message.success {
             background-color: #e8f5e9;
             color: #2e7d32;
             border: 1px solid #a5d6a7;
         }
+
         .link {
             text-align: center;
             margin-top: 20px;
             color: #666;
         }
-        .link a, a:visited {
+
+        .link a,
+        a:visited {
             color: #1E90FF;
             text-decoration: none;
         }
+
         .link a:hover {
             text-decoration: underline;
         }
+
+        /* fix glitch with images to make them fit inside the parent container */
+        img {
+            width: 100%;
+            height: 100%;
+        }
     </style>
 </head>
+
 <body>
     <div class="container">
         {% if messages %}
@@ -110,9 +143,10 @@
             {% endfor %}
         </div>
         {% endif %}
-        
+
         {% block content %}
         {% endblock %}
     </div>
 </body>
+
 </html>
