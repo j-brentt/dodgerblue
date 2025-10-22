@@ -189,3 +189,76 @@ class FollowRequestViewTests(TestCase):
         self.assertFalse(
             FollowRequest.objects.filter(follower=self.follower, followee=self.followee).exists()
         )
+
+class ProfileEditTests(TestCase):
+    def setUp(self):
+        """
+        Set up test data for the profile edit functionality.
+        """
+        self.author = Author.objects.create_user(
+            username="janedoe",
+            password="testpass123",
+            display_name="Jane Doe",
+            github="https://github.com/janedoe",
+            profile_image="https://example.com/avatar.png",
+        )
+        self.other_author = Author.objects.create_user(
+            username="johnsmith",
+            password="testpass123",
+            display_name="John Smith",
+            github="https://github.com/johnsmith",
+            profile_image="https://example.com/avatar2.png",
+        )
+        self.client.force_login(self.author)  # Log in as the author
+
+    def test_author_can_edit_profile(self):
+        """
+        Test that an author can edit their profile.
+        """
+        edit_url = reverse("authors:profile_edit", kwargs={"author_id": self.author.id})
+        new_data = {
+            "display_name": "Updated Jane Doe",
+            "github": "https://github.com/updatedjanedoe",
+            "profile_image": "https://example.com/updated_avatar.png",
+        }
+
+        # Send a POST request to update the profile
+        response = self.client.post(edit_url, new_data)
+
+        # Assert the response redirects to the stream page
+        self.assertEqual(response.status_code, 302)
+        self.assertRedirects(response, reverse("stream"))
+
+        # Refresh the author object from the database
+        self.author.refresh_from_db()
+
+        # Assert the author's profile was updated
+        self.assertEqual(self.author.display_name, new_data["display_name"])
+        self.assertEqual(self.author.github, new_data["github"])
+        self.assertEqual(self.author.profile_image, new_data["profile_image"])
+
+    def test_author_cannot_edit_another_authors_profile(self):
+        """
+        Test that an author cannot edit another author's profile.
+        """
+        edit_url = reverse("authors:profile_edit", kwargs={"author_id": self.other_author.id})
+        new_data = {
+            "display_name": "Malicious Update",
+            "github": "https://github.com/malicious",
+            "profile_image": "https://example.com/malicious_avatar.png",
+        }
+
+        # Send a POST request to update another author's profile
+        response = self.client.post(edit_url, new_data)
+
+        # Assert the response redirects to the stream page with an error
+        self.assertEqual(response.status_code, 302)
+        self.assertRedirects(response, reverse("stream"))
+
+        # Refresh the other author object from the database
+        self.other_author.refresh_from_db()
+
+        # Assert the other author's profile was not updated
+        self.assertNotEqual(self.other_author.display_name, new_data["display_name"])
+        self.assertNotEqual(self.other_author.github, new_data["github"])
+        self.assertNotEqual(self.other_author.profile_image, new_data["profile_image"])

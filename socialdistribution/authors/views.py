@@ -7,6 +7,9 @@ from django.urls import reverse, NoReverseMatch
 from .models import Author, FollowRequest, FollowRequestStatus
 from entries.models import Entry, Visibility
 from .forms import ProfileEditForm
+from rest_framework.response import Response
+from rest_framework.decorators import api_view
+from .serializers import AuthorSerializer
 
 def signup(request):
     """Handle user registration"""
@@ -156,7 +159,6 @@ def profile_detail(request, author_id):
         "friends_count": friends_count,
     }
     return render(request, "authors/profile_detail.html", context)
-
 
 @login_required
 def send_follow_request(request, author_id):

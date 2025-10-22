@@ -17,6 +17,6 @@ class AuthorListView(generics.ListAPIView):
     GET /api/authors/
     Returns a list of all authors (public accounts).
     """
-    queryset = Author.objects.all()
+    queryset = Author.objects.all().order_by("id") 
     serializer_class = AuthorSerializer
     permission_classes = [permissions.AllowAny]
