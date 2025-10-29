@@ -3,11 +3,13 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.views.generic import ListView, DetailView
 from django.core.exceptions import PermissionDenied
-from django.http import Http404
+from django.http import Http404, JsonResponse
+from django.core.files.storage import default_storage
 from .models import Entry, Visibility
 from .forms import EntryForm
 import uuid
 import base64
+from django.conf import settings
 
 class PublicEntriesListView(ListView):
     model = Entry
@@ -171,3 +173,12 @@ def my_entries(request):
     entries = Entry.objects.filter(author=request.user).exclude(visibility='DELETED').order_by('-published')
     context = {'entries': entries}
     return render(request, 'entries/my_entries.html', context)
+
+@login_required
+def upload_image(request):
+    if request.method == 'POST' and request.FILES.get('image'):
+        image_file = request.FILES['image']
+        image_path = default_storage.save(f'uploads/{image_file.name}', image_file)
+        image_url = request.build_absolute_uri(settings.MEDIA_URL + image_path)
+        return JsonResponse({'url': image_url})
+    return JsonResponse({'error': 'No image provided'}, status=400)

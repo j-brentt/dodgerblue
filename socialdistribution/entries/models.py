@@ -52,6 +52,14 @@ class Entry(models.Model):
         default=Visibility.PUBLIC,
     )
     
+    # To keep track of which GitHub activity this entry came from
+    source_id = models.CharField(
+    max_length=255,
+    blank=True,
+    null=True,
+    unique=True,
+)
+
     def can_view(self, user) -> bool:
         """
         Returns True if the given user can view this entry.

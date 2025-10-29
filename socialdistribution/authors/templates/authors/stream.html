@@ -113,6 +113,16 @@
         <div class="card" style="margin-bottom: 20px;">
             <!-- Entry header with author info -->
             <div style="display: flex; align-items: center; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid #eee;">
+                {% if entry.author.profile_image %}
+                    <img src="{{ entry.author.profile_image }}" 
+                         alt="{{ entry.author.display_name }}" 
+                         style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover; margin-right: 10px;">
+                {% else %}
+                    <div style="width: 40px; height: 40px; border-radius: 50%; background: #ddd; display: flex; align-items: center; justify-content: center; font-weight: bold; color: #555; margin-right: 10px;">
+                        {{ entry.author.display_name|first|upper }}
+                    </div>
+                {% endif %}
+                
                 <div style="flex-grow: 1;">
                     <div style="font-weight: 500; color: #333; margin-bottom: 3px;">
                         <a href="{% url 'authors:profile_detail' entry.author.id %}" style="color: #1E90FF; text-decoration: none;">
