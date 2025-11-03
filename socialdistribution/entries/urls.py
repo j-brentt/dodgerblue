@@ -10,5 +10,7 @@ urlpatterns = [
     path('<uuid:entry_id>/edit/', views.edit_entry, name='edit_entry'),
     path('<uuid:entry_id>/delete/', views.delete_entry, name='delete_entry'),
     path('<uuid:entry_id>/like/', views.like_entry, name='like_entry'),
+    path('<uuid:entry_id>/comments/', views.add_comment, name='add_comment'),
+    path('comments/<uuid:comment_id>/like/', views.like_comment, name='like_comment'),
     path('public/', views.PublicEntriesListView.as_view(), name='public_entries'),
 ]

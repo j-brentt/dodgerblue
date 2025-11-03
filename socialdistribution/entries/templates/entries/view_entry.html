@@ -112,6 +112,84 @@
     .badge-public { background-color: #e8f5e9; color: #2e7d32; }
     .badge-friends { background-color: #fff3e0; color: #e65100; }
     .badge-unlisted { background-color: #e3f2fd; color: #1565c0; }
+    .comments-section {
+        margin-top: 30px;
+        border-top: 1px solid #eee;
+        padding-top: 24px;
+    }
+    .comments-section h3 {
+        margin-bottom: 16px;
+    }
+    .comment-list {
+        list-style: none;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        margin-bottom: 20px;
+    }
+    .comment {
+        padding: 12px 16px;
+        background: #f8f9fa;
+        border-radius: 6px;
+    }
+    .comment-footer {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-top: 10px;
+        font-size: 13px;
+        color: #555;
+    }
+    .comment-like-form {
+        display: inline;
+    }
+    .comment-like-form button {
+        background: none;
+        border: none;
+        color: #1E90FF;
+        cursor: pointer;
+        font-weight: 500;
+        padding: 0;
+    }
+    .comment-like-form button:hover {
+        text-decoration: underline;
+    }
+    .comment-header {
+        display: flex;
+        justify-content: space-between;
+        font-size: 13px;
+        color: #555;
+        margin-bottom: 8px;
+    }
+    .comment-body {
+        white-space: pre-wrap;
+        color: #333;
+    }
+    .comment-form textarea {
+        width: 100%;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        padding: 10px;
+        font-family: inherit;
+        resize: vertical;
+    }
+    .comment-form button {
+        margin-top: 10px;
+        background-color: #1E90FF;
+        color: white;
+        border: none;
+        padding: 10px 18px;
+        border-radius: 4px;
+        cursor: pointer;
+    }
+    .comment-form button:hover {
+        background-color: #187bcd;
+    }
+    .comment-note {
+        font-size: 13px;
+        color: #666;
+        margin-bottom: 12px;
+    }
 </style>
 
 <div class="card">
@@ -206,5 +284,50 @@
                 });
         }
         </script>
+
+    <div class="comments-section">
+        <h3>Comments</h3>
+        {% if is_friend_view %}
+        <p class="comment-note">Only you and {{ entry.author.display_name }} can view your comments on this entry.</p>
+        {% endif %}
+        {% if comments %}
+        <ul class="comment-list">
+            {% for comment in comments %}
+            <li class="comment">
+                <div class="comment-header">
+                    <span>{{ comment.author.display_name }}</span>
+                    <span>{{ comment.created_at|date:"F j, Y g:i a" }}</span>
+                </div>
+                <div class="comment-body">{{ comment.content }}</div>
+                <div class="comment-footer">
+                    <span>{{ comment.likes_count }} like{{ comment.likes_count|pluralize }}</span>
+                    {% if request.user.is_authenticated %}
+                        {% if request.user == comment.author or request.user == entry.author %}
+                        <form method="post" action="{% url 'entries:like_comment' comment.id %}" class="comment-like-form">
+                            {% csrf_token %}
+                            <button type="submit">Like</button>
+                        </form>
+                        {% endif %}
+                    {% endif %}
+                </div>
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <p>No comments yet. Be the first to respond.</p>
+        {% endif %}
+
+        {% if request.user.is_authenticated %}
+        <form method="post" action="{% url 'entries:add_comment' entry.id %}" class="comment-form">
+            {% csrf_token %}
+            {{ comment_form.non_field_errors }}
+            {{ comment_form.content.errors }}
+            {{ comment_form.content }}
+            <button type="submit">Post Comment</button>
+        </form>
+        {% else %}
+        <p><a href="{% url 'authors:login' %}?next={{ request.path }}">Log in</a> to write a comment.</p>
+        {% endif %}
+    </div>
 </div>
 {% endblock %}

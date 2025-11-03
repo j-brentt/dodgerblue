@@ -7,8 +7,8 @@ from django.views.generic import ListView, DetailView
 from django.core.exceptions import PermissionDenied
 from django.http import Http404, JsonResponse
 from django.core.files.storage import default_storage
-from .models import Entry, Visibility
-from .forms import EntryForm
+from .models import Entry, Visibility, Comment
+from .forms import EntryForm, CommentForm
 import uuid
 import base64
 from django.conf import settings
@@ -167,7 +167,26 @@ def view_entry(request, entry_id):
     if not entry.can_view(request.user):
         raise PermissionDenied
 
-    context = {"entry": entry, "liked_users": liked_users}
+    comments = entry.comments.select_related("author")
+    if (
+        entry.visibility == Visibility.FRIENDS
+        and request.user.is_authenticated
+        and request.user != entry.author
+    ):
+        comments = comments.filter(author__in=[request.user, entry.author])
+    comment_form = CommentForm()
+
+    context = {
+        "entry": entry,
+        "liked_users": liked_users,
+        "comments": comments,
+        "comment_form": comment_form,
+        "is_friend_view": (
+            entry.visibility == Visibility.FRIENDS
+            and request.user.is_authenticated
+            and request.user != entry.author
+        ),
+    }
     return render(request, "entries/view_entry.html", context)
 
 @login_required
@@ -191,6 +210,61 @@ def like_entry(request, entry_id):
     ):
         return redirect(next_url)
     return redirect("entries:view_entry", entry_id=entry.id)
+
+
+@login_required
+@require_POST
+def add_comment(request, entry_id):
+    try:
+        entry_uuid = uuid.UUID(str(entry_id))
+    except (ValueError, TypeError):
+        raise Http404("Invalid entry ID")
+
+    entry = get_object_or_404(Entry, id=entry_uuid)
+
+    if not entry.can_view(request.user):
+        raise PermissionDenied
+
+    form = CommentForm(request.POST)
+    if form.is_valid():
+        Comment.objects.create(
+            entry=entry,
+            author=request.user,
+            content=form.cleaned_data["content"],
+        )
+        messages.success(request, "Comment posted.")
+    else:
+        messages.error(request, "Please correct the comment and try again.")
+
+    return redirect("entries:view_entry", entry_id=entry.id)
+
+
+@login_required
+@require_POST
+def like_comment(request, comment_id):
+    try:
+        comment_uuid = uuid.UUID(str(comment_id))
+    except (ValueError, TypeError):
+        raise Http404("Invalid comment ID")
+
+    comment = get_object_or_404(
+        Comment.objects.select_related("entry"),
+        id=comment_uuid,
+    )
+
+    if not comment.entry.can_view(request.user):
+        raise PermissionDenied
+
+    if (
+        comment.entry.visibility == Visibility.FRIENDS
+        and request.user not in {comment.entry.author, comment.author}
+    ):
+        raise PermissionDenied
+
+    comment.liked_by.add(request.user)
+    messages.success(request, "Comment liked.")
+    return redirect("entries:view_entry", entry_id=comment.entry.id)
+
 
 @login_required
 def my_entries(request):

@@ -118,3 +118,36 @@ class Entry(models.Model):
     def __str__(self):
         return f"{self.title} by {self.author.display_name}"
 
+
+class Comment(models.Model):
+    """User-submitted comment attached to an entry."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    entry = models.ForeignKey(
+        Entry,
+        on_delete=models.CASCADE,
+        related_name="comments",
+    )
+    author = models.ForeignKey(
+        Author,
+        on_delete=models.CASCADE,
+        related_name="comments",
+    )
+    content = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    liked_by = models.ManyToManyField(
+        User,
+        related_name="liked_comments",
+        blank=True,
+    )
+
+    @property
+    def likes_count(self):
+        return self.liked_by.count()
+
+    class Meta:
+        ordering = ["created_at"]
+
+    def __str__(self):
+        return f"Comment by {self.author} on {self.entry}"
+
