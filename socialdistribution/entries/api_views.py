@@ -1,11 +1,13 @@
-from rest_framework import generics, permissions
+from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.shortcuts import get_object_or_404
 from django.http import Http404
 from django.db.models import Q
+from django.urls import reverse
 from .models import Entry, Visibility
 from authors.models import FollowRequestStatus, Author
+from authors.serializers import AuthorSerializer
 from .serializers import EntrySerializer
 
 class PublicEntriesListView(generics.ListAPIView):
@@ -106,3 +108,53 @@ class EntryEditDeleteView(generics.RetrieveUpdateDestroyAPIView):
             raise Http404("Entry not found")
 
         return entry
+    
+class EntryLikesListView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request, entry_id):
+        entry = get_object_or_404(Entry, id=entry_id)
+        if not entry.can_view(request.user):
+            raise Http404
+
+        # Pagination parameters 
+        page = max(1, int(request.query_params.get("page", 1)))
+        size = max(1, int(request.query_params.get("size", 5)))
+        start = (page - 1) * size
+        end = start + size
+
+        likes_qs = entry.liked_by.all()
+        likes_page = likes_qs[start:end]
+
+        likes_api_url = request.build_absolute_uri(
+            reverse("api:entry-likes", args=[entry.id])
+        )
+        entry_html_url = request.build_absolute_uri(
+            reverse("entries:view_entry", args=[entry.id])
+        )
+
+        src = []
+        for author in likes_page:
+            src.append(
+                {
+                    "type": "like",
+                    "author": AuthorSerializer(
+                        author, context={"request": request}
+                    ).data,
+                    "published": entry.updated,
+                    "id": f"{likes_api_url}{author.id}/",
+                    "object": entry_html_url,
+                }
+            )
+
+        return Response(
+            {
+                "type": "likes",
+                "web": entry_html_url,
+                "id": likes_api_url,
+                "page_number": page,
+                "size": size,
+                "count": likes_qs.count(),
+                "src": src,
+            }
+        )

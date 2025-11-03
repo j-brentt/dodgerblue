@@ -3,15 +3,23 @@ from django.urls import reverse
 from .models import Entry
 from authors.serializers import AuthorSerializer
 
+from rest_framework import serializers
+from django.urls import reverse
+from .models import Entry, Comment
+from authors.serializers import AuthorSerializer
+
 class EntrySerializer(serializers.ModelSerializer):
     """
     Serializer for the Entry model, used in the API to convert Entry instances
     to JSON and vice versa. Includes nested author information.
     """
-    type = serializers.CharField(default="entry", read_only = True)
+    type = serializers.CharField(default="entry", read_only=True)
     id = serializers.SerializerMethodField()
     web = serializers.SerializerMethodField()
     author = AuthorSerializer(read_only=True)
+    contentType = serializers.CharField(source="content_type")
+    comments = serializers.SerializerMethodField()
+    likes = serializers.SerializerMethodField()
 
     class Meta:
         """
@@ -19,8 +27,18 @@ class EntrySerializer(serializers.ModelSerializer):
         """
         model = Entry
         fields = [
-            "type", "id", "web", "title", "description", "content_type", "content",
-            "visibility", "published", "author"
+            "type",
+            "id",
+            "web",
+            "title",
+            "description",
+            "contentType",
+            "content",
+            "visibility",
+            "published",
+            "author",
+            "comments",
+            "likes",
         ]
 
     def get_id(self, obj):
@@ -28,11 +46,53 @@ class EntrySerializer(serializers.ModelSerializer):
         Generate full URL for the API endpoint of the entry
         """
         request = self.context.get("request")
-        return request.build_absolute_uri(reverse("api:entry-detail", args=[obj.id]))
+        return request.build_absolute_uri(
+            reverse("api:entry-detail", args=[obj.id])
+        )
 
     def get_web(self, obj):
         """
-        Generatesthe URL for the HTML page of the entry
+        Generates the URL for the HTML page of the entry
         """
         request = self.context.get("request")
-        return request.build_absolute_uri(reverse("entries:view_entry", args=[obj.id]))
+        return request.build_absolute_uri(
+            reverse("entries:view_entry", args=[obj.id])
+        )
+
+    
+
+    def get_likes(self, obj):
+        request = self.context.get("request")
+        likes_qs = obj.liked_by.all()
+        page = int(request.query_params.get("like_page", 1))
+        size = int(request.query_params.get("like_size", 50))
+        start = (page - 1) * size
+        end = start + size
+        entry_api_url = self.get_id(obj)
+        entry_html_url = self.get_web(obj)
+        likes_url = request.build_absolute_uri(
+            reverse("api:entry-likes", args=[obj.id])
+        )
+        likes_page = likes_qs[start:end]
+        src = []
+        for author in likes_page:
+            src.append(
+                {
+                    "type": "like",
+                    "author": AuthorSerializer(
+                        author, context={"request": request}
+                    ).data,
+                    "published": obj.updated,
+                    "id": f"{likes_url}{author.id}/",
+                    "object": entry_html_url,
+                }
+            )
+        return {
+            "type": "likes",
+            "web": entry_html_url,
+            "id": likes_url,
+            "page_number": page,
+            "size": size,
+            "count": likes_qs.count(),
+            "src": src,
+        }
