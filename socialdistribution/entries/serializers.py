@@ -95,6 +95,29 @@ class EntrySerializer(serializers.ModelSerializer):
             "count": likes_qs.count(),
             "src": src,
         }
+    
+    def get_comments(self, obj):
+        """
+        Retrieve and serialize the comments for the entry.
+        """
+        request = self.context.get("request")
+        comments_qs = obj.comments.all()  # Assuming `comments` is the related name for the Comment model
+        page = int(request.query_params.get("comment_page", 1))
+        size = int(request.query_params.get("comment_size", 50))
+        start = (page - 1) * size
+        end = start + size
+        comments_page = comments_qs[start:end]
+        comments_url = request.build_absolute_uri(
+            reverse("api:entry-comments", args=[obj.id])
+        )
+        return {
+            "type": "comments",
+            "id": comments_url,
+            "page_number": page,
+            "size": size,
+            "count": comments_qs.count(),
+            "src": CommentSerializer(comments_page, many=True, context={"request": request}).data,
+        }
 
 
 class CommentSerializer(serializers.ModelSerializer):

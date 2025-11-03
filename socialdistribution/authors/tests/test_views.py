@@ -255,52 +255,51 @@ class AuthorAndEntryURLTests(APITestCase):
         """
         Test that an author can create an entry with Markdown content.
         """
-        self.client.force_login(self.author)  # Verify that 'force_login' works with the 'APITestCase' client.
+        self.client.force_login(self.author)
 
         # Data for the new entry
         data = {
-            "title": "Markdown Entry",  # Check if 'title' is a valid field in the 'Entry' model.
-            "description": "This is a test entry with Markdown",  # Verify 'description' exists in the 'Entry' model.
-            "content": "# Hello World\nThis is **bold** text.",  # Ensure 'content' is a valid field in the 'Entry' model.
-            "content_type": "text/markdown",  # Confirm 'content_type' supports 'text/markdown' in the 'Entry' model.
-            "visibility": "PUBLIC"  # Verify 'visibility' supports 'PUBLIC' in the 'Entry' model.
+            "title": "Markdown Entry",
+            "description": "This is a test entry with Markdown",
+            "content": "# Hello World\nThis is **bold** text.",
+            "contentType": "text/markdown",  # Matches CONTENT_TYPE_CHOICES
+            "visibility": "PUBLIC"  # Matches VISIBILITY_CHOICES
         }
 
         # API call to create the entry
-        response = self.client.post(f'/api/author/{self.author.id}/entries/', data, format='json')  
-        # Check if the endpoint '/api/author/<author_id>/entries/' exists and is implemented correctly.
-        print(response.content)
+        response = self.client.post(f'/api/author/{self.author.id}/entries/', data, format='json')
+        print(response.content)  # Debugging: Print the response content
 
         # Assert the entry was created successfully
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)  # Verify the API returns HTTP 201 for successful creation.
-        self.assertEqual(response.data['title'], data['title'])  # Ensure the response contains the correct 'title'.
-        self.assertEqual(response.data['content'], data['content'])  # Verify the response contains the correct 'content'.
-        self.assertEqual(response.data['content_type'], data['content_type'])  # Confirm the 'content_type' matches.
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data['title'], data['title'])
+        self.assertEqual(response.data['content'], data['content'])
+        self.assertEqual(response.data['contentType'], data['contentType'])
 
     def test_retrieve_markdown_entry(self): #Posting 5
         """
         Test that an entry with Markdown content can be retrieved.
         """
         # Create an entry with Markdown content
-        entry = Entry.objects.create(  # Check if 'Entry.objects.create' works and the fields match the model definition.
-            id=uuid.uuid4(),  # Ensure 'id' is a UUIDField in the 'Entry' model.
-            title="Markdown Entry",  # Verify 'title' exists in the 'Entry' model.
-            description="This is a test entry with Markdown",  # Confirm 'description' exists in the 'Entry' model.
-            content="# Hello World\nThis is **bold** text.",  # Ensure 'content' is a valid field in the 'Entry' model.
-            content_type="text/markdown",  # Verify 'content_type' supports 'text/markdown' in the 'Entry' model.
-            author=self.author,  # Ensure 'author' is a ForeignKey to the 'Author' model.
-            visibility=Visibility.PUBLIC,  # Confirm 'visibility' supports 'PUBLIC' in the 'Entry' model.
+        entry = Entry.objects.create(
+            id=uuid.uuid4(),
+            title="Markdown Entry",
+            description="This is a test entry with Markdown",
+            content="# Hello World\nThis is **bold** text.",
+            content_type="text/markdown",
+            author=self.author,
+            visibility=Visibility.PUBLIC,
         )
 
         # API call to retrieve the entry
-        response = self.client.get(f'/api/entries/{entry.id}/')  
-        # Check if the endpoint '/api/entries/<entry_id>/' exists and is implemented correctly.
+        response = self.client.get(f'/api/entries/{entry.id}/')
+        print(response.content)  # Debugging: Print the response content
 
         # Assert the entry was retrieved successfully
-        self.assertEqual(response.status_code, status.HTTP_200_OK)  # Verify the API returns HTTP 200 for successful retrieval.
-        self.assertEqual(response.data['title'], entry.title)  # Ensure the response contains the correct 'title'.
-        self.assertEqual(response.data['content'], entry.content)  # Verify the response contains the correct 'content'.
-        self.assertEqual(response.data['content_type'], entry.content_type)  # Confirm the 'content_type' matches.
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['title'], entry.title)
+        self.assertEqual(response.data['content'], entry.content)
+        self.assertEqual(response.data['contentType'], entry.content_type)
     
     def test_render_markdown_entry(self): #Posting 5
         """
@@ -335,27 +334,28 @@ class AuthorAndEntryURLTests(APITestCase):
         """
         Test that an author can create an entry with image content.
         """
-        self.client.force_login(self.author)  # Log in as the author
+        self.client.force_login(self.author)
 
         # Data for the new image entry
         data = {
             "title": "Image Entry",
             "description": "This is a test entry with an image.",
-            "content": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAUA"  # Example base64-encoded image
-                       "AAAABCAIAAACQd1PeAAAAEElEQVR42mP8/5+hPAAHggJ/P9ZqAAAAAElFTkSuQmCC",
-            "content_type": "image/png;base64",
-            "visibility": "PUBLIC"
+            "content": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAUA"
+                    "AAAABCAIAAACQd1PeAAAAEElEQVR42mP8/5+hPAAHggJ/P9ZqAAAAAElFTkSuQmCC",
+            "contentType": "image/png;base64",  # Matches CONTENT_TYPE_CHOICES
+            "visibility": "PUBLIC"  # Matches VISIBILITY_CHOICES
         }
 
         # API call to create the entry
         response = self.client.post(f'/api/author/{self.author.id}/entries/', data, format='json')
+        print(response.content)  # Debugging: Print the response content
 
         # Assert the entry was created successfully
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.data['title'], data['title'])
-        self.assertEqual(response.data['content_type'], data['content_type'])
+        self.assertEqual(response.data['contentType'], data['contentType'])
 
-    def test_retrieve_image_entry(self):  #Posting 7
+    def test_retrieve_image_entry(self): #Posting 7
         """
         Test that an image entry can be retrieved.
         """
@@ -373,11 +373,12 @@ class AuthorAndEntryURLTests(APITestCase):
 
         # API call to retrieve the entry
         response = self.client.get(f'/api/entries/{entry.id}/')
+        print(response.content)  # Debugging: Print the response content
 
         # Assert the entry was retrieved successfully
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['title'], entry.title)
-        self.assertEqual(response.data['content_type'], entry.content_type)
+        self.assertEqual(response.data['contentType'], entry.content_type)
         self.assertEqual(response.data['content'], entry.content)
 
     def test_invalid_image_entry(self):  #Posting 7
@@ -391,7 +392,7 @@ class AuthorAndEntryURLTests(APITestCase):
             "title": "Invalid Image Entry",
             "description": "This entry has an invalid image format.",
             "content": "data:image/invalid;base64,INVALIDBASE64DATA",
-            "content_type": "image/invalid;base64",
+            "contentType": "image/invalid;base64",
             "visibility": "PUBLIC"
         }
 
