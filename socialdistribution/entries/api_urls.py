@@ -15,6 +15,7 @@ from .api_views import (
     EntryCommentsListCreateView,
     CommentDetailView,
     CommentLikeView,
+    render_markdown_entry,
 )
 
 app_name = "api"
@@ -47,4 +48,5 @@ urlpatterns = [
     path("comments/<uuid:comment_id>/", CommentDetailView.as_view(), name="comment-detail"),
     path("comments/<uuid:comment_id>/like/", CommentLikeView.as_view(), name="comment-like"),
     path("upload-image/", upload_image, name="upload_image"),
+    path('entries/<uuid:entry_id>/rendered/', render_markdown_entry, name='entry-rendered'),
 ]
