@@ -5,10 +5,10 @@ from django.shortcuts import get_object_or_404
 from django.http import Http404
 from django.db.models import Q
 from django.urls import reverse
-from .models import Entry, Visibility
-from authors.models import FollowRequestStatus, Author
+from .models import Entry, Visibility, Comment
+from authors.models import FollowRequestStatus
 from authors.serializers import AuthorSerializer
-from .serializers import EntrySerializer
+from .serializers import EntrySerializer, CommentSerializer
 
 class PublicEntriesListView(generics.ListAPIView):
     serializer_class = EntrySerializer
@@ -158,3 +158,104 @@ class EntryLikesListView(APIView):
                 "src": src,
             }
         )
+
+
+
+class EntryCommentsListCreateView(generics.ListCreateAPIView):
+    """
+    GET /api/entries/<entry_id>/comments/
+    POST /api/entries/<entry_id>/comments/
+    """
+
+    serializer_class = CommentSerializer
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+    _entry = None
+
+    def get_entry(self):
+        if self._entry is not None:
+            return self._entry
+        entry = get_object_or_404(Entry, id=self.kwargs["entry_id"])
+        if not entry.can_view(self.request.user):
+            raise Http404("Entry not found")
+        self._entry = entry
+        return entry
+
+    def get_queryset(self):
+        entry = self.get_entry()
+        comments = entry.comments.select_related("author")
+        if (
+            entry.visibility == Visibility.FRIENDS
+            and self.request.user.is_authenticated
+            and self.request.user != entry.author
+        ):
+            comments = comments.filter(author__in=[self.request.user, entry.author])
+        return comments.order_by("created_at")
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        serializer = self.get_serializer(queryset, many=True, context=self.get_serializer_context())
+        entry_url = request.build_absolute_uri(
+            reverse("api:entry-detail", args=[self.get_entry().id])
+        )
+        return Response({
+            "type": "comments",
+            "entry": entry_url,
+            "comments": serializer.data,
+        })
+
+    def perform_create(self, serializer):
+        entry = self.get_entry()
+        if not self.request.user.is_authenticated:
+            raise Http404("Entry not found")
+        serializer.save(entry=entry, author=self.request.user)
+
+
+class CommentDetailView(generics.RetrieveAPIView):
+    """
+    GET /api/comments/<comment_id>/
+    """
+
+    serializer_class = CommentSerializer
+    permission_classes = [permissions.AllowAny]
+
+    def get_object(self):
+        comment = get_object_or_404(
+            Comment.objects.select_related("entry", "author"),
+            id=self.kwargs["comment_id"],
+        )
+        entry = comment.entry
+        if not entry.can_view(self.request.user):
+            raise Http404("Comment not found")
+        if (
+            entry.visibility == Visibility.FRIENDS
+            and self.request.user != entry.author
+            and self.request.user != comment.author
+        ):
+            raise Http404("Comment not found")
+        return comment
+
+
+class CommentLikeView(APIView):
+    """
+    POST /api/comments/<comment_id>/like/
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, comment_id):
+        comment = get_object_or_404(
+            Comment.objects.select_related("entry"),
+            id=comment_id,
+        )
+        entry = comment.entry
+        if not entry.can_view(request.user):
+            raise Http404("Comment not found")
+        if (
+            entry.visibility == Visibility.FRIENDS
+            and request.user not in {entry.author, comment.author}
+        ):
+            raise Http404("Comment not found")
+
+        comment.liked_by.add(request.user)
+        serializer = CommentSerializer(comment, context={"request": request})
+        return Response(serializer.data, status=status.HTTP_200_OK)
