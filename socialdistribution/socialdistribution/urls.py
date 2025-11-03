@@ -16,17 +16,41 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
-from authors import views as author_views
 from django.conf import settings
 from django.conf.urls.static import static
+from authors import views as author_views
+
+from rest_framework.permissions import AllowAny
+from drf_spectacular.views import (
+    SpectacularAPIView,
+    SpectacularSwaggerView,
+    SpectacularRedocView,
+)
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+
+    # site views
     path('', author_views.stream, name='stream'),
     path('authors/', include('authors.urls')),
     path('entries/', include('entries.urls')),
+
+    # API routes
     path('api/', include('entries.api_urls')),
     path('api/', include('authors.api_urls')),
+
+    # OpenAPI schema + UIs
+    path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
+    path(
+        'api/schema/swagger-ui/',
+        SpectacularSwaggerView.as_view(url_name='schema', permission_classes=[AllowAny]),
+        name='swagger-ui',
+    ),
+    path(
+        'api/schema/redoc/',
+        SpectacularRedocView.as_view(url_name='schema', permission_classes=[AllowAny]),
+        name='redoc',
+    ),
 ]
 
 if settings.DEBUG:
