@@ -37,11 +37,12 @@ def create_entry(request):
         if form.is_valid():
             content_type = form.cleaned_data['content_type']
             # Handle image entries
-            if content_type in ['image/png;base64', 'image/jpeg;base64']:
+            if content_type.startswith('image'):
                 image_file = form.cleaned_data['image']
-                # Convert image to base64
+                mime = image_file.content_type
                 image_data = base64.b64encode(image_file.read()).decode('utf-8')
                 content = image_data
+                content_type = f"{mime};base64"
             else:
                 # Handle text entries
                 content = form.cleaned_data['content']

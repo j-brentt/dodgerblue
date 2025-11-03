@@ -22,7 +22,7 @@ class EntryForm(forms.Form):
     
     content_type = forms.ChoiceField(
         choices=[('text/plain', 'Plain Text'),
-                 ('image/png;base64', 'Image'),
+                 ('image', 'Image'),
                  ('text/markdown', 'Markdown'),
         ],
         initial='text/plain',
