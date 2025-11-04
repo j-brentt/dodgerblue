@@ -105,9 +105,10 @@ def stream(request):
     candidate_entries = Entry.objects.filter(
         Q(visibility=Visibility.PUBLIC) |
         Q(author=author) |
-        Q(author__in=following_authors) |
-        Q(visibility=Visibility.UNLISTED)
+        Q(visibility=Visibility.FRIENDS, author__in=following_authors) |
+        Q(visibility=Visibility.UNLISTED, author__in=following_authors)
     ).select_related("author").order_by("-published")
+
 
     # Filter using can_view
     entries = [entry for entry in candidate_entries if entry.can_view(author)]

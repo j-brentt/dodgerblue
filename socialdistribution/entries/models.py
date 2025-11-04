@@ -76,6 +76,10 @@ class Entry(models.Model):
         if self.visibility == Visibility.DELETED:
             return False
 
+        # Unlisted posts — visible to anyone with the link (even if not logged in)
+        if self.visibility == Visibility.UNLISTED:
+            return True
+        
         if not user or not user.is_authenticated:
             return False
 
