@@ -319,3 +319,8 @@ def friends_list(request, author_id):
         "profile_author": profile_author,
         "title": f"{profile_author.display_name}'s Friends",
     })
+
+@login_required
+def explore_authors(request):
+    """Show explore authors page"""
+    return render(request, 'authors/explore_authors.html')

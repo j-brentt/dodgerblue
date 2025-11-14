@@ -29,6 +29,8 @@ urlpatterns = [
     path("<uuid:author_id>/following/", views.following_list, name="following_list"),
     path("<uuid:author_id>/friends/", views.friends_list, name="friends_list"),
 
+    path('explore/', views.explore_authors, name='explore-authors'),
+
     # Main app pages (requires login)
     path('stream/', views.stream, name='stream'),
 ]

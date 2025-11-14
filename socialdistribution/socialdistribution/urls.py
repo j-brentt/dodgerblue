@@ -19,6 +19,7 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 from authors import views as author_views
+from entries.api_views import InboxView
 
 from rest_framework.permissions import AllowAny
 from drf_spectacular.views import (
@@ -51,6 +52,8 @@ urlpatterns = [
         SpectacularRedocView.as_view(url_name='schema', permission_classes=[AllowAny]),
         name='redoc',
     ),
+
+    path('authors/<uuid:author_id>/inbox/', InboxView.as_view(), name='author-inbox'),
 ]
 
 if settings.DEBUG:

@@ -14,6 +14,10 @@ from authors.serializers import AuthorSerializer
 from .serializers import EntrySerializer, CommentSerializer
 from django.http import JsonResponse
 import commonmark
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework import status
+from django.utils import timezone
+from dateutil import parser as date_parser
 
 
 def resolve_author_or_404(identifier: str) -> Author:
@@ -577,3 +581,261 @@ def render_markdown_entry(request, entry_id):
 
     # Return the rendered content as JSON
     return JsonResponse({"rendered_content": rendered_content})
+
+class InboxView(APIView):
+    """
+    POST /api/authors/{AUTHOR_SERIAL}/inbox/
+    Receives entries, likes, comments, and follow requests from remote nodes.
+    """
+    permission_classes = [permissions.AllowAny]  # Auth handled by HTTP Basic Auth
+    
+    def post(self, request, author_id):
+        # Get the target author (the one receiving in their inbox)
+        try:
+            recipient = Author.objects.get(id=author_id)
+        except Author.DoesNotExist:
+            return Response(
+                {'detail': 'Author not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Get the incoming object
+        data = request.data
+        object_type = data.get('type', '').lower()
+        
+        try:
+            if object_type == 'entry':
+                return self._handle_entry(recipient, data, request)
+            elif object_type == 'like':
+                return self._handle_like(recipient, data, request)
+            elif object_type == 'comment':
+                return self._handle_comment(recipient, data, request)
+            elif object_type == 'follow':
+                return self._handle_follow(recipient, data, request)
+            else:
+                return Response(
+                    {'detail': f'Unsupported type: {object_type}'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        except Exception as e:
+            return Response(
+                {'detail': f'Error processing {object_type}: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    def _handle_entry(self, recipient: Author, data: dict, request):
+        """Handle incoming entry from remote node"""
+        author_data = data.get('author', {})
+        remote_author_id = author_data.get('id', '').rstrip('/')
+        
+        if not remote_author_id:
+            return Response({'detail': 'Missing author.id'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Get or create the remote author
+        remote_author, created = Author.objects.get_or_create(
+            id=remote_author_id,
+            defaults={
+                'username': author_data.get('displayName', 'unknown').replace(' ', '_').lower(),
+                'display_name': author_data.get('displayName', 'Unknown'),
+                'github': author_data.get('github', ''),
+                'profile_image': author_data.get('profileImage', ''),
+                'is_active': False,  # Remote authors can't log in locally
+            }
+        )
+        
+        # Parse the entry ID
+        entry_id = data.get('id', '').rstrip('/')
+        if not entry_id:
+            return Response({'detail': 'Missing entry id'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Parse published date
+        published = data.get('published')
+        if published:
+            try:
+                published = date_parser.parse(published)
+            except:
+                published = timezone.now()
+        else:
+            published = timezone.now()
+        
+        # Map visibility
+        visibility_map = {
+            'PUBLIC': Visibility.PUBLIC,
+            'FRIENDS': Visibility.FRIENDS,
+            'UNLISTED': Visibility.UNLISTED,
+            'DELETED': Visibility.DELETED,
+        }
+        visibility = visibility_map.get(
+            data.get('visibility', 'PUBLIC').upper(),
+            Visibility.PUBLIC
+        )
+        
+        # Create or update the entry
+        entry, created = Entry.objects.update_or_create(
+            id=entry_id,
+            defaults={
+                'author': remote_author,
+                'title': data.get('title', ''),
+                'content': data.get('content', ''),
+                'content_type': data.get('contentType', 'text/plain'),
+                'description': data.get('description', ''),
+                'visibility': visibility,
+                'published': published,
+            }
+        )
+        
+        return Response(
+            {'detail': 'Entry received', 'entry_id': str(entry.id)},
+            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK
+        )
+    
+    def _handle_like(self, recipient: Author, data: dict, request):
+        """Handle incoming like from remote node"""
+        author_data = data.get('author', {})
+        remote_author_id = author_data.get('id', '').rstrip('/')
+        object_url = data.get('object', '').rstrip('/')
+        
+        if not remote_author_id or not object_url:
+            return Response(
+                {'detail': 'Missing author.id or object'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Get or create the remote author
+        remote_author, _ = Author.objects.get_or_create(
+            id=remote_author_id,
+            defaults={
+                'username': author_data.get('displayName', 'unknown').replace(' ', '_').lower(),
+                'display_name': author_data.get('displayName', 'Unknown'),
+                'is_active': False,
+            }
+        )
+        
+        # Try to extract ID from URL - handle both entry and comment likes
+        try:
+            # Try entry like first
+            if '/entries/' in object_url or '/entry/' in object_url:
+                # Extract UUID from URL
+                parts = object_url.split('/')
+                entry_id = parts[-1] if parts[-1] else parts[-2]
+                
+                entry = Entry.objects.get(id=entry_id)
+                entry.liked_by.add(remote_author)
+                return Response(
+                    {'detail': 'Like added to entry'},
+                    status=status.HTTP_200_OK
+                )
+            
+            # Try comment like
+            elif '/comments/' in object_url or '/comment/' in object_url:
+                parts = object_url.split('/')
+                comment_id = parts[-1] if parts[-1] else parts[-2]
+                
+                comment = Comment.objects.get(id=comment_id)
+                comment.liked_by.add(remote_author)
+                return Response(
+                    {'detail': 'Like added to comment'},
+                    status=status.HTTP_200_OK
+                )
+            
+            else:
+                return Response(
+                    {'detail': 'Could not determine object type from URL'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        
+        except (Entry.DoesNotExist, Comment.DoesNotExist):
+            return Response(
+                {'detail': 'Object not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            return Response(
+                {'detail': f'Error processing like: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    def _handle_comment(self, recipient: Author, data: dict, request):
+        """Handle incoming comment from remote node"""
+        author_data = data.get('author', {})
+        remote_author_id = author_data.get('id', '').rstrip('/')
+        entry_url = data.get('entry', '').rstrip('/')
+        comment_id = data.get('id', '').rstrip('/')
+        
+        if not remote_author_id or not entry_url or not comment_id:
+            return Response(
+                {'detail': 'Missing required fields'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Get or create the remote author
+        remote_author, _ = Author.objects.get_or_create(
+            id=remote_author_id,
+            defaults={
+                'username': author_data.get('displayName', 'unknown').replace(' ', '_').lower(),
+                'display_name': author_data.get('displayName', 'Unknown'),
+                'is_active': False,
+            }
+        )
+        
+        # Extract entry ID from URL
+        try:
+            parts = entry_url.split('/')
+            entry_id = parts[-1] if parts[-1] else parts[-2]
+            entry = Entry.objects.get(id=entry_id, author=recipient)
+        except Entry.DoesNotExist:
+            return Response(
+                {'detail': 'Entry not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Create or update the comment
+        comment, created = Comment.objects.update_or_create(
+            id=comment_id,
+            defaults={
+                'entry': entry,
+                'author': remote_author,
+                'comment': data.get('comment', ''),
+                'content_type': data.get('contentType', 'text/plain'),
+            }
+        )
+        
+        return Response(
+            {'detail': 'Comment received'},
+            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK
+        )
+    
+    def _handle_follow(self, recipient: Author, data: dict, request):
+        """Handle incoming follow request from remote node"""
+        actor_data = data.get('actor', {})
+        remote_author_id = actor_data.get('id', '').rstrip('/')
+        
+        if not remote_author_id:
+            return Response(
+                {'detail': 'Missing actor.id'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Get or create the remote author
+        remote_author, _ = Author.objects.get_or_create(
+            id=remote_author_id,
+            defaults={
+                'username': actor_data.get('displayName', 'unknown').replace(' ', '_').lower(),
+                'display_name': actor_data.get('displayName', 'Unknown'),
+                'github': actor_data.get('github', ''),
+                'profile_image': actor_data.get('profileImage', ''),
+                'is_active': False,
+            }
+        )
+        
+        # Create or update follow request
+        follow_request, created = FollowRequest.objects.get_or_create(
+            follower=remote_author,
+            followee=recipient,
+            defaults={'status': FollowRequestStatus.PENDING}
+        )
+        
+        return Response(
+            {'detail': 'Follow request received'},
+            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK
+        )

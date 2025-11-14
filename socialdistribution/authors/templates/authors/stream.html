@@ -95,8 +95,10 @@
     <div class="nav-links">
         <a href="{% url 'entries:create_entry' %}" style="background-color: #1E90FF; color: white; padding: 8px 16px; border-radius: 4px;">+ New Entry</a>
         <a href="{{ author.get_absolute_url }}">View Profile</a>
+        <a href="{% url 'authors:explore-authors'  %}">Explore Authors</a>
         <a href="{% url 'authors:follow_requests' %}">Follow Requests{% if pending_follow_requests_count %} ({{ pending_follow_requests_count }}){% endif %}</a>
-        <a href="{% url 'entries:my_entries'  %}">My Entries</a> 
+        <a href="{% url 'entries:my_entries'  %}">My Entries</a>  
+
         <!-- From the prompt and the previous logout link format: Why does the logout link not redirect to login? 
         ChatGPT 4.5, OpenAI, 2025-10-09,https://chatgpt.com/c/68e7e183-3464-8321-9632-2877858f6937-->
         <form action="{% url 'authors:logout' %}" method="post" style="display:inline;">

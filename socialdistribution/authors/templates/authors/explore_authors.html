@@ -1,0 +1,155 @@
+{% extends "base.html" %}
+{% block title %}Explore Authors{% endblock %}
+{% block content %}
+<div class="card profile-card">
+    <div class="profile-header">
+        <div class="profile-meta">
+            <h1 class="profile-username">Explore Authors</h1>
+        </div>
+    </div>
+    
+    <div class="profile-section">
+        <h2>All Authors</h2>
+        <div id="authors-list">
+            <p>Loading authors...</p>
+        </div>
+    </div>
+    
+    <div style="margin-top: 16px;">
+        <a href="{% url 'stream' %}" style="color: #1E90FF;">← Return to Stream</a>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    fetchAuthors();
+});
+
+async function fetchAuthors() {
+    try {
+        const response = await fetch('/api/authors/explore/', {
+            credentials: 'include'
+        });
+        
+        if (!response.ok) throw new Error('Failed to fetch');
+        
+        const data = await response.json();
+        renderAuthors(data.all || []);
+    } catch (error) {
+        console.error('Error:', error);
+        document.getElementById('authors-list').innerHTML = 
+            '<p style="color: red;">Failed to load authors. Make sure you are logged in.</p>';
+    }
+}
+
+function renderAuthors(authors) {
+    const container = document.getElementById('authors-list');
+    
+    if (!authors || authors.length === 0) {
+        container.innerHTML = '<p>No authors found.</p>';
+        return;
+    }
+    
+    const authorItems = authors.map(author => {
+        const isRemote = author._is_remote || false;
+        const badge = isRemote ? 
+            `<span style="background: #17a2b8; color: white; padding: 2px 8px; border-radius: 4px; font-size: 12px; margin-left: 8px;">${author._node_name || 'Remote'}</span>` : 
+            '<span style="background: #28a745; color: white; padding: 2px 8px; border-radius: 4px; font-size: 12px; margin-left: 8px;">Local</span>';
+        
+        const authorId = author.id || author.apiId || '';
+        const displayName = author.displayName || author.display_name || 'Unknown';
+        const username = author.username || displayName.toLowerCase().replace(/\s+/g, '_');
+        const profileImage = author.profileImage || author.profile_image || '';
+        const profileUrl = author.web || '#';
+        
+        return `
+            <li class="entry-item" style="display: flex; align-items: center; gap: 10px; justify-content: space-between;">
+                <div style="display: flex; align-items: center; gap: 10px; flex: 1;">
+                    ${profileImage ? 
+                        `<img src="${profileImage}" alt="${displayName}" style="width: 40px; height: 40px; border-radius: 50%;" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                         <div class="profile-avatar placeholder" style="width: 40px; height: 40px; border-radius: 50%; background: #ddd; display: none; align-items: center; justify-content: center;">
+                             ${displayName.charAt(0).toUpperCase()}
+                         </div>` :
+                        `<div class="profile-avatar placeholder" style="width: 40px; height: 40px; border-radius: 50%; background: #ddd; display: flex; align-items: center; justify-content: center;">
+                             ${displayName.charAt(0).toUpperCase()}
+                         </div>`
+                    }
+                    <div style="flex: 1;">
+                        <div style="display: flex; align-items: center;">
+                            <h3 style="margin: 0;">${displayName}</h3>
+                            ${badge}
+                        </div>
+                        <p class="entry-description" style="margin: 0;">@${username}</p>
+                    </div>
+                </div>
+                <button onclick="followAuthor('${authorId}', '${displayName.replace(/'/g, "\\'")}', this)" 
+                        style="background-color: #1E90FF; color: white; padding: 6px 16px; border: none; border-radius: 4px; cursor: pointer;">
+                    Follow
+                </button>
+            </li>
+        `;
+    }).join('');
+    
+    container.innerHTML = `<ul class="entry-list">${authorItems}</ul>`;
+}
+
+async function followAuthor(authorId, displayName, button) {
+    if (!authorId) {
+        alert('Invalid author ID');
+        return;
+    }
+    
+    if (!confirm(`Send follow request to ${displayName}?`)) {
+        return;
+    }
+    
+    // Disable button during request
+    button.disabled = true;
+    button.textContent = 'Sending...';
+    
+    try {
+        const response = await fetch('/api/authors/follow/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            credentials: 'include',
+            body: JSON.stringify({ author_id: authorId })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            alert(`✅ Follow request sent to ${displayName}!`);
+            button.textContent = 'Sent';
+            button.style.backgroundColor = '#28a745';
+        } else {
+            alert(`❌ ${data.detail}`);
+            button.disabled = false;
+            button.textContent = 'Follow';
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Failed to send follow request');
+        button.disabled = false;
+        button.textContent = 'Follow';
+    }
+}
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie) {
+        const cookies = document.cookie.split(';');
+        for (let cookie of cookies) {
+            cookie = cookie.trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+</script>
+{% endblock %}
