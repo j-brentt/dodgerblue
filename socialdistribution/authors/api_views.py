@@ -226,26 +226,67 @@ def api_follow_author(request):
             print(f"📥 Response text: {response.text[:500]}")
             
             if response.ok:
-                # Store locally
+                # Store locally - extract UUID from the remote author URL
+                try:
+                    # Extract UUID from the target URL
+                    remote_uuid = target_author_url.split('/')[-1]
+                    import uuid as uuid_module
+                    uuid_module.UUID(remote_uuid)  # Validate it's a UUID
+                except (ValueError, IndexError):
+                    return Response({
+                        'detail': 'Invalid remote author UUID',
+                    }, status=status.HTTP_400_BAD_REQUEST)
+                
+                # Fetch author info from remote node
+                try:
+                    author_response = requests.get(
+                        target_author_url,
+                        auth=HTTPBasicAuth(remote_node.username, remote_node.password) if remote_node.username else None,
+                        timeout=5
+                    )
+                    
+                    if author_response.ok:
+                        author_info = author_response.json()
+                        display_name = author_info.get('displayName', 'Remote Author')
+                        github = author_info.get('github', '')
+                        profile_image = author_info.get('profileImage', '')
+                    else:
+                        display_name = 'Remote Author'
+                        github = ''
+                        profile_image = ''
+                except:
+                    display_name = 'Remote Author'
+                    github = ''
+                    profile_image = ''
+    
+                # Store the remote author locally
                 remote_author, _ = Author.objects.get_or_create(
-                    id=target_author_url,
+                    id=remote_uuid,  # Use just the UUID
                     defaults={
-                        'username': f"remote_{target_author_url.split('/')[-1][:20]}",
-                        'display_name': 'Remote Author',
+                        'username': f"remote_{remote_uuid[:20]}",
+                        'display_name': display_name,
+                        'github': github,
+                        'profile_image': profile_image,
                         'is_active': False,
                     }
                 )
-                
+
+                # Treat remote follow as already accepted on *our* node
                 follow_req, created = FollowRequest.objects.get_or_create(
                     follower=request.user,
                     followee=remote_author,
-                    defaults={'status': FollowRequestStatus.PENDING}
+                    defaults={'status': FollowRequestStatus.APPROVED},
                 )
-                
+
+                if not created and follow_req.status != FollowRequestStatus.APPROVED:
+                    follow_req.status = FollowRequestStatus.APPROVED
+                    follow_req.save()
+
                 return Response({
-                    'detail': 'Follow request sent to remote node',
+                    'detail': 'Now following remote author',
                     'created': created
-                }, status=status.HTTP_201_CREATED)
+                }, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
+
             else:
                 return Response({
                     'detail': 'Failed to send to remote node',

@@ -115,15 +115,15 @@ def stream(request):
     # Friends are mutual follows
     friends = set(following) & set(followers)
     
-    # Build the query
     entries = Entry.objects.select_related('author').filter(
-        Q(visibility=Visibility.PUBLIC) |  # ALL public entries from ANYONE
-        Q(visibility=Visibility.UNLISTED, author__in=following) |  # Unlisted from followed authors
-        Q(visibility=Visibility.FRIENDS, author__in=friends) |  # Friends-only from friends
-        Q(author=current_user, visibility__in=[Visibility.UNLISTED, Visibility.FRIENDS])  # My unlisted/friends entries
+        Q(visibility=Visibility.PUBLIC) |  # all public entries (local + remote)
+        Q(author=current_user, visibility__in=[Visibility.UNLISTED, Visibility.FRIENDS]) |  # my unlisted/friends-only
+        Q(author__in=following, visibility=Visibility.UNLISTED) |  # unlisted from people I follow
+        Q(author__in=friends, visibility=Visibility.FRIENDS)  # friends-only from mutual follows
     ).exclude(
-        visibility=Visibility.DELETED  # Never show deleted entries
+        visibility=Visibility.DELETED
     ).distinct().order_by('-published')
+
     
     # Get pending follow requests count for navbar
     pending_follow_requests_count = FollowRequest.objects.filter(
