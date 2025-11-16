@@ -721,14 +721,21 @@ class InboxView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
+        raw_host = (author_data.get('host', '') or '').rstrip('/')
+        if raw_host.endswith('/api'):
+            base_host = raw_host[:-4]
+        else:
+            base_host = raw_host
+
         remote_author, created = Author.objects.get_or_create(
             id=remote_uuid,
             defaults={
-                'username': author_data.get('displayName', 'unknown').replace(' ', '_').lower()[:150],
-                'display_name': author_data.get('displayName', 'Unknown'),
-                'github': author_data.get('github', ''),
-                'profile_image': author_data.get('profileImage', ''),
+                'username': ...,
+                'display_name': ...,
+                'github': ...,
+                'profile_image': ...,
                 'is_active': False,
+                'host': base_host,
             }
         )
 
@@ -918,6 +925,7 @@ class InboxView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
+        # 1) Extract UUID from full URL
         try:
             import uuid as uuid_module
             uuid_str = remote_author_id.split('/')[-1]
@@ -928,8 +936,16 @@ class InboxView(APIView):
                 {'detail': f'Could not extract valid UUID from author ID: {remote_author_id}'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-    
-        remote_author, _ = Author.objects.get_or_create(
+
+        # 2) Extract and normalize host from actor.host
+        raw_host = (actor_data.get('host', '') or '').rstrip('/')
+        if raw_host.endswith('/api'):
+            base_host = raw_host[:-4]  # strip trailing "/api"
+        else:
+            base_host = raw_host
+
+        # 3) Get or create remote author, storing host
+        remote_author, created = Author.objects.get_or_create(
             id=author_id_for_db,
             defaults={
                 'username': actor_data.get('displayName', 'unknown').replace(' ', '_').lower()[:150],
@@ -937,9 +953,16 @@ class InboxView(APIView):
                 'github': actor_data.get('github', ''),
                 'profile_image': actor_data.get('profileImage', ''),
                 'is_active': False,
+                'host': base_host,   
             }
         )
+
+        # (optional) If author already existed but had no host, you can backfill it:
+        if not created and not getattr(remote_author, 'host', None) and base_host:
+            remote_author.host = base_host
+            remote_author.save(update_fields=['host'])
         
+        # 4) Create or update follow request
         follow_request, created = FollowRequest.objects.get_or_create(
             follower=remote_author,
             followee=recipient,
