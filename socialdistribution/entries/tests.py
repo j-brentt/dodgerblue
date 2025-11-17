@@ -1,10 +1,12 @@
-from django.test import TestCase, Client
+from django.test import TestCase, Client, RequestFactory
 from django.urls import reverse
 from django.contrib.auth import get_user_model
-from .models import Entry, Comment
+from unittest.mock import patch
+from .models import Entry, Comment, RemoteNode, Visibility
 from authors.models import FollowRequest, FollowRequestStatus
 from rest_framework.test import APIClient
 from rest_framework import status
+from .api_views import send_entry_to_remote_followers
 User = get_user_model()
 
 class EntryVisibilityTests(TestCase):
@@ -383,6 +385,168 @@ class EntryAPITests(TestCase):
         self.assertEqual(response.data['content'], data['content'])
         self.assertEqual(response.data['content_type'], data['content_type'])
 
+
+class RemoteEntryFederationTests(TestCase):
+    def setUp(self):
+        self.factory = RequestFactory()
+        self.author = User.objects.create_user(
+            username="local_author",
+            password="pw",
+            display_name="Local Author",
+        )
+        self.remote_author = User.objects.create_user(
+            username="remote_author",
+            password="pw",
+            display_name="Remote Author",
+        )
+        self.remote_author.host = "https://remote.example.com"
+        self.remote_author.save(update_fields=["host"])
+        self.remote_node = RemoteNode.objects.create(
+            name="Remote Node",
+            base_url="https://remote.example.com/api",
+            username="remoteuser",
+            password="remotepass",
+        )
+        self.request = self.factory.post("/")
+        self.request.user = self.author
+
+    def _create_entry(self, visibility: str) -> Entry:
+        return Entry.objects.create(
+            author=self.author,
+            title=f"{visibility} entry",
+            description="",
+            content="hello",
+            content_type="text/plain",
+            visibility=visibility,
+        )
+
+    def _approve_remote_follower(self):
+        FollowRequest.objects.create(
+            follower=self.remote_author,
+            followee=self.author,
+            status=FollowRequestStatus.APPROVED,
+        )
+
+    @patch("entries.api_views.requests.post")
+    def test_public_entry_sent_to_remote_followers(self, mock_post):
+        self._approve_remote_follower()
+        entry = self._create_entry(Visibility.PUBLIC)
+
+        send_entry_to_remote_followers(entry, self.request)
+
+        self.assertTrue(mock_post.called)
+        inbox_url = f"https://remote.example.com/api/authors/{self.remote_author.id}/inbox/"
+        called_url = mock_post.call_args.args[0]
+        self.assertEqual(called_url, inbox_url)
+        payload = mock_post.call_args.kwargs.get("json", {})
+        self.assertEqual(payload.get("visibility"), Visibility.PUBLIC)
+
+    @patch("entries.api_views.requests.post")
+    def test_friends_entry_sent_to_remote_mutual_friends(self, mock_post):
+        self._approve_remote_follower()
+        FollowRequest.objects.create(
+            follower=self.author,
+            followee=self.remote_author,
+            status=FollowRequestStatus.APPROVED,
+        )
+        entry = self._create_entry(Visibility.FRIENDS)
+
+        send_entry_to_remote_followers(entry, self.request)
+
+        mock_post.assert_called_once()
+        payload = mock_post.call_args.kwargs.get("json", {})
+        self.assertEqual(payload.get("visibility"), Visibility.FRIENDS)
+
+    @patch("entries.api_views.requests.post")
+    def test_friends_entry_not_sent_without_mutual_follow(self, mock_post):
+        self._approve_remote_follower()
+        entry = self._create_entry(Visibility.FRIENDS)
+
+        send_entry_to_remote_followers(entry, self.request)
+
+        mock_post.assert_not_called()
+
+
+class EntryEditResendTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.author = User.objects.create_user(
+            username="edit_author",
+            password="pw",
+            display_name="Editor",
+        )
+        self.entry = Entry.objects.create(
+            author=self.author,
+            title="Original",
+            description="",
+            content="hello",
+            content_type="text/plain",
+            visibility=Visibility.PUBLIC,
+        )
+
+    @patch("entries.api_views.send_entry_to_remote_followers")
+    def test_edit_api_resends_entry_to_remote_followers(self, mock_send):
+        self.client.force_authenticate(user=self.author)
+        url = reverse("api:entry_edit", args=[self.entry.id])
+        data = {
+            "title": "Updated Title",
+            "description": "Updated",
+            "content": "updated content",
+            "content_type": "text/plain",
+            "visibility": Visibility.PUBLIC,
+        }
+
+        response = self.client.put(url, data, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        mock_send.assert_called_once()
+        sent_entry = mock_send.call_args.args[0]
+        self.assertEqual(sent_entry.id, self.entry.id)
+        self.entry.refresh_from_db()
+        self.assertEqual(self.entry.title, "Updated Title")
+
+
+class EntryDeleteFederationTests(TestCase):
+    def setUp(self):
+        self.client = Client()
+        self.api_client = APIClient()
+        self.author = User.objects.create_user(
+            username="delete_author",
+            password="pw",
+            display_name="Deleter",
+        )
+        self.entry = Entry.objects.create(
+            author=self.author,
+            title="To Delete",
+            description="",
+            content="bye",
+            content_type="text/plain",
+            visibility=Visibility.PUBLIC,
+        )
+
+    @patch("entries.api_views.send_entry_to_remote_followers")
+    def test_api_delete_resends_entry(self, mock_send):
+        self.api_client.force_authenticate(user=self.author)
+        url = reverse("api:entry_edit", args=[self.entry.id])
+
+        response = self.api_client.delete(url)
+
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        mock_send.assert_called_once()
+        self.entry.refresh_from_db()
+        self.assertEqual(self.entry.visibility, "DELETED")
+
+    @patch("entries.views.send_entry_to_remote_followers")
+    def test_html_delete_resends_entry(self, mock_send):
+        self.client.login(username="delete_author", password="pw")
+        url = reverse("entries:delete_entry", args=[self.entry.id])
+
+        response = self.client.post(url)
+
+        self.assertEqual(response.status_code, 302)
+        mock_send.assert_called_once()
+        self.entry.refresh_from_db()
+        self.assertEqual(self.entry.visibility, "DELETED")
 
 class CommentAPITests(TestCase):
     def setUp(self):

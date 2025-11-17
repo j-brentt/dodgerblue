@@ -148,6 +148,7 @@ def delete_entry(request, entry_id):
         # Mark as deleted (dont remove from database)
         entry.visibility = 'DELETED'
         entry.save()
+        send_entry_to_remote_followers(entry, request)
         
         messages.success(request, 'Entry deleted successfully!')
         return redirect('authors:stream')

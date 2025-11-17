@@ -183,13 +183,17 @@ from entries.models import Entry, Visibility, RemoteNode
 
 
 def send_entry_to_remote_followers(entry: Entry, request):
-    """
-    Push a PUBLIC entry to the inbox of all remote followers
-    of the entry's author.
-    """
-    # Only federate PUBLIC posts (for now?)
-    if entry.visibility != Visibility.PUBLIC:
-        print(f"[send_entry_to_remote_followers] Not sending entry {entry.id}: visibility={entry.visibility}")
+    """Send freshly created/updated entries to any remote followers/friends."""
+    allowed_visibilities = {
+        Visibility.PUBLIC,
+        Visibility.FRIENDS,
+        Visibility.DELETED,
+        "DELETED",
+    }
+    if entry.visibility not in allowed_visibilities:
+        print(
+            f"[send_entry_to_remote_followers] Not sending entry {entry.id}: visibility={entry.visibility}"
+        )
         return
 
     author = entry.author
@@ -200,6 +204,13 @@ def send_entry_to_remote_followers(entry: Entry, request):
         followee=author,
         status=FollowRequestStatus.APPROVED,
     ).select_related('follower')
+
+    author_following_ids = set(
+        FollowRequest.objects.filter(
+            follower=author,
+            status=FollowRequestStatus.APPROVED,
+        ).values_list('followee_id', flat=True)
+    )
 
     print(f"[send_entry_to_remote_followers] author={author.id} host={current_host} followers={followers_qs.count()}")
 
@@ -220,7 +231,15 @@ def send_entry_to_remote_followers(entry: Entry, request):
 
         # Skip local followers (no host or same host as current node)
         if not follower_host or follower_host == current_host:
-            print(f"[send_entry_to_remote_followers] -> skip follower={follower.id} (local or missing host)")
+            print(
+                f"[send_entry_to_remote_followers] -> skip follower={follower.id} (local or missing host)"
+            )
+            continue
+
+        if entry.visibility in {Visibility.FRIENDS, "FRIENDS"} and follower.id not in author_following_ids:
+            print(
+                f"[send_entry_to_remote_followers] -> skip follower={follower.id} (not mutual friend)"
+            )
             continue
 
         # Build follower's author URL on THEIR node
@@ -314,6 +333,15 @@ class EntryEditDeleteView(generics.RetrieveUpdateDestroyAPIView):
             raise Http404("Entry not found")
 
         return entry
+
+    def perform_update(self, serializer):
+        entry = serializer.save()
+        send_entry_to_remote_followers(entry, self.request)
+
+    def perform_destroy(self, instance):
+        instance.visibility = "DELETED"
+        instance.save(update_fields=["visibility"])
+        send_entry_to_remote_followers(instance, self.request)
 
 class EntryLikeView(APIView):
     """
