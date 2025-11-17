@@ -966,7 +966,7 @@ class InboxView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        # 1) Extract UUID from full URL
+        # Extract UUID
         try:
             import uuid as uuid_module
             uuid_str = remote_author_id.split('/')[-1]
@@ -978,14 +978,14 @@ class InboxView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # 2) Extract and normalize host from actor.host
+        # Normalize host
         raw_host = (actor_data.get('host', '') or '').rstrip('/')
         if raw_host.endswith('/api'):
-            base_host = raw_host[:-4]  # strip trailing "/api"
+            base_host = raw_host[:-4]
         else:
             base_host = raw_host
 
-        # 3) Get or create remote author, storing host
+        # Get or create remote author with host
         remote_author, created = Author.objects.get_or_create(
             id=author_id_for_db,
             defaults={
@@ -994,15 +994,15 @@ class InboxView(APIView):
                 'github': actor_data.get('github', ''),
                 'profile_image': actor_data.get('profileImage', ''),
                 'is_active': False,
-                'host': base_host,   
+                'host': base_host,
             }
         )
         if not created and not getattr(remote_author, 'host', None) and base_host:
             remote_author.host = base_host
             remote_author.save(update_fields=['host'])
         
-        # 4) Create or update follow request
-        follow_request, created = FollowRequest.objects.get_or_create(
+        # RECEIVER side: keep this PENDING so user can approve/deny
+        follow_req, created = FollowRequest.objects.get_or_create(
             follower=remote_author,
             followee=recipient,
             defaults={'status': FollowRequestStatus.PENDING}

@@ -313,34 +313,54 @@ def api_follow_author(request):
             return Response({
                 'detail': f'Connection error: {str(e)}'
             }, status=status.HTTP_503_SERVICE_UNAVAILABLE)
-
+        
 @api_view(['GET'])
 @drf_permission_classes([IsLocalUserOnly])
 def check_follow_status(request, author_id):
     """
     GET /api/authors/<uuid:author_id>/follow-status/
-    Check if the current user follows this author
+    Check if the current user follows this author.
+    For REMOTE authors, never return 'pending' – from our node's POV it's
+    either 'following' (have a FollowRequest row) or 'not_following'.
     """
     try:
         target_author = Author.objects.get(id=author_id)
     except Author.DoesNotExist:
         return Response({'status': 'not_following'}, status=status.HTTP_200_OK)
-    
+
     follow_req = FollowRequest.objects.filter(
         follower=request.user,
         followee=target_author
     ).first()
-    
+
+    # Figure out if this author is remote
+    current_host = request.build_absolute_uri('/').rstrip('/')
+    author_host = (getattr(target_author, 'host', '') or '').rstrip('/')
+
+    is_remote = bool(author_host and author_host != current_host)
+
     if not follow_req:
         status_value = 'not_following'
-    elif follow_req.status == FollowRequestStatus.APPROVED:
-        status_value = 'following'
-    elif follow_req.status == FollowRequestStatus.PENDING:
-        status_value = 'pending'
     else:
-        status_value = 'not_following'
-    
+        if is_remote:
+            # For remote authors: if we have a FollowRequest row at all,
+            # treat as "following" (per spec: just show them as followed).
+            if follow_req.status == FollowRequestStatus.PENDING:
+                # Upgrade old data if it was left as pending
+                follow_req.status = FollowRequestStatus.APPROVED
+                follow_req.save(update_fields=['status'])
+            status_value = 'following'
+        else:
+            # Local authors keep the normal pending/approved semantics
+            if follow_req.status == FollowRequestStatus.APPROVED:
+                status_value = 'following'
+            elif follow_req.status == FollowRequestStatus.PENDING:
+                status_value = 'pending'
+            else:
+                status_value = 'not_following'
+
     return Response({'status': status_value})
+
 
 @api_view(['POST'])
 @drf_permission_classes([IsLocalUserOnly])
