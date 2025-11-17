@@ -2,6 +2,7 @@ from rest_framework import generics, permissions, status
 from rest_framework.decorators import api_view, permission_classes as drf_permission_classes
 from rest_framework.views import APIView
 from rest_framework.response import Response
+from socialdistribution.permissions import IsAuthenticatedNode, IsAuthenticatedNodeOrLocalUser, IsLocalUserOnly
 from django.urls import reverse
 import requests
 from requests.auth import HTTPBasicAuth
@@ -12,20 +13,31 @@ from authors.serializers import AuthorSerializer
 class AuthorDetailView(generics.RetrieveAPIView):
     """
     GET /api/author/<id>
-    Used to retreive the author detials and serialize them
-    Accessible to anyone (Accounts are public)
+    Used to retrieve the author details and serialize them
+    Accessible to both remote nodes and local users (public data)
     """
     queryset = Author.objects.all()
     serializer_class = AuthorSerializer
-    permission_classes = [permissions.AllowAny]
+    # Allow both authenticated nodes and local users to access
+    permission_classes = [IsAuthenticatedNodeOrLocalUser]
+    
+    def retrieve(self, request, *args, **kwargs):
+        # Log if accessed by remote node
+        if hasattr(request.user, 'node'):
+            print(f"Remote node {request.user.node.name} accessing author detail")
+        
+        return super().retrieve(request, *args, **kwargs)
+
 
 class AuthorListView(generics.ListAPIView):
     """
     GET /api/authors/
     Returns a list of approved public authors.
+    Accessible to both remote nodes and local users
     """
     serializer_class = AuthorSerializer 
-    permission_classes = [permissions.AllowAny]
+    # Allow both authenticated nodes and local users to access
+    permission_classes = [IsAuthenticatedNodeOrLocalUser]
 
     def get_queryset(self):
         return Author.objects.filter(
@@ -34,6 +46,10 @@ class AuthorListView(generics.ListAPIView):
         ).order_by("id")
 
     def list(self, request, *args, **kwargs):
+        # Log if accessed by remote node
+        if hasattr(request.user, 'node'):
+            print(f"Remote node {request.user.node.name} accessing authors list")
+        
         queryset = self.get_queryset()
         serializer = self.get_serializer(queryset, many=True)
         return Response({
@@ -41,12 +57,15 @@ class AuthorListView(generics.ListAPIView):
             "authors": serializer.data
         })
     
+
 class ExploreAuthorsView(APIView):
     """
     GET /api/authors/explore/
     Returns all local authors + authors from connected remote nodes
+    Only accessible to local authenticated users (not remote nodes)
     """
-    permission_classes = [permissions.IsAuthenticated]
+    # Only local users should access this endpoint
+    permission_classes = [IsLocalUserOnly]
     
     def get(self, request):
         from entries.models import RemoteNode
@@ -97,13 +116,16 @@ class ExploreAuthorsView(APIView):
             'remote': remote_authors,
             'all': local_serializer.data + remote_authors
         })
+
+
 @api_view(['POST'])
-@drf_permission_classes([permissions.IsAuthenticated])
+@drf_permission_classes([IsLocalUserOnly])  # Only local users can follow
 def api_follow_author(request):
     """
     POST /api/authors/follow/
     API endpoint for following local or remote authors
     Body: { "author_id": "full URL of author to follow" }
+    Only accessible to local authenticated users
     """
     target_author_url = request.data.get('author_id', '').rstrip('/')
     
