@@ -127,8 +127,8 @@ LOGIN_URL = 'authors:login'
 # DRF config
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework.authentication.BasicAuthentication',
-        'rest_framework.authentication.SessionAuthentication',
+        'socialdistribution.authentication.RemoteNodeBasicAuthentication', # Checks for the remote nodes first
+        'rest_framework.authentication.SessionAuthentication',         # Then checks for local user sessions
     ],
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticatedOrReadOnly',
