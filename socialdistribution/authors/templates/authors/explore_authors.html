@@ -9,6 +9,7 @@
     </div>
     
     <div class="profile-section">
+        <h2>All Authors</h2>
         <div id="authors-list">
             <p>Loading authors...</p>
         </div>
@@ -33,12 +34,40 @@ async function fetchAuthors() {
         if (!response.ok) throw new Error('Failed to fetch');
         
         const data = await response.json();
-        renderAuthors(data.all || []);
+        
+        // Fetch follow status for all authors
+        const authorsWithStatus = await Promise.all(
+            (data.all || []).map(async (author) => {
+                const followStatus = await checkFollowStatus(author.id);
+                return { ...author, followStatus };
+            })
+        );
+        
+        renderAuthors(authorsWithStatus);
     } catch (error) {
         console.error('Error:', error);
         document.getElementById('authors-list').innerHTML = 
             '<p style="color: red;">Failed to load authors. Make sure you are logged in.</p>';
     }
+}
+
+async function checkFollowStatus(authorId) {
+    try {
+        // Extract UUID from full URL if needed
+        const uuid = authorId.split('/').filter(Boolean).pop();
+        
+        const response = await fetch(`/api/authors/${uuid}/follow-status/`, {
+            credentials: 'include'
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            return data.status; // 'following', 'pending', 'not_following'
+        }
+    } catch (error) {
+        console.error('Error checking follow status:', error);
+    }
+    return 'not_following';
 }
 
 function renderAuthors(authors) {
@@ -51,16 +80,41 @@ function renderAuthors(authors) {
     
     const authorItems = authors.map(author => {
         const isRemote = author._is_remote || false;
-        
-        // Get correct field names from the SPEC
         const authorId = author.id || '';
-        const displayName = author.displayName || 'Unknown';  // ← Only displayName exists in spec
+        const displayName = author.displayName || 'Unknown';
         const profileImage = author.profileImage || '';
         
-        // Badge styling - make it inline and not cramped
         const badge = isRemote ? 
             `<span style="background: #17a2b8; color: white; padding: 4px 10px; border-radius: 4px; font-size: 11px; white-space: nowrap;">${author._node_name || 'Remote'}</span>` : 
             '<span style="background: #28a745; color: white; padding: 4px 10px; border-radius: 4px; font-size: 11px; white-space: nowrap;">Local</span>';
+        
+        // Determine button based on follow status
+        let buttonHtml = '';
+        if (author.followStatus === 'following') {
+            buttonHtml = `
+                <button onclick="unfollowAuthor('${authorId}', '${displayName.replace(/'/g, "\\'")}', this)" 
+                        style="background-color: #c62828; color: white; padding: 8px 20px;
+                            border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">
+                    Unfollow
+                </button>
+            `;
+        } else if (author.followStatus === 'pending') {
+            buttonHtml = `
+                <button disabled
+                        style="background-color: #ef6c00; color: white; padding: 8px 20px;
+                            border: none; border-radius: 4px; cursor: not-allowed; font-size: 14px;">
+                    Pending
+                </button>
+            `;
+        } else {
+            buttonHtml = `
+                <button onclick="followAuthor('${authorId}', '${displayName.replace(/'/g, "\\'")}', this)" 
+                        style="background-color: #1E90FF; color: white; padding: 8px 20px;
+                            border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">
+                    Follow
+                </button>
+            `;
+        }
         
         return `
         <li class="entry-item">
@@ -85,12 +139,7 @@ function renderAuthors(authors) {
                 </div>
                 ${badge}
             </div>
-
-            <button onclick="followAuthor('${authorId}', '${displayName.replace(/'/g, "\\'")}', this)"
-                    style="background-color: #1E90FF; color: white; padding: 8px 20px;
-                        border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">
-                Follow
-            </button>
+            ${buttonHtml}
         </li>
     `;
     }).join('');
@@ -108,7 +157,6 @@ async function followAuthor(authorId, displayName, button) {
         return;
     }
     
-    // Disable button during request
     button.disabled = true;
     button.textContent = 'Sending...';
     
@@ -126,9 +174,9 @@ async function followAuthor(authorId, displayName, button) {
         const data = await response.json();
         
         if (response.ok) {
-            alert(`✅ Follow request sent to ${displayName}!`);
-            button.textContent = 'Sent';
-            button.style.backgroundColor = '#28a745';
+            alert(`✅ ${data.detail}`);
+            // Refresh the list to update button states
+            fetchAuthors();
         } else {
             alert(`❌ ${data.detail}`);
             button.disabled = false;
@@ -139,6 +187,46 @@ async function followAuthor(authorId, displayName, button) {
         alert('Failed to send follow request');
         button.disabled = false;
         button.textContent = 'Follow';
+    }
+}
+
+async function unfollowAuthor(authorId, displayName, button) {
+    if (!confirm(`Unfollow ${displayName}?`)) {
+        return;
+    }
+    
+    button.disabled = true;
+    button.textContent = 'Unfollowing...';
+    
+    try {
+        // Extract UUID from full URL
+        const uuid = authorId.split('/').filter(Boolean).pop();
+        
+        const response = await fetch(`/api/authors/${uuid}/unfollow/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            credentials: 'include'
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            alert(`✅ Unfollowed ${displayName}`);
+            // Refresh the list to update button states
+            fetchAuthors();
+        } else {
+            alert(`❌ ${data.detail || 'Failed to unfollow'}`);
+            button.disabled = false;
+            button.textContent = 'Unfollow';
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Failed to unfollow');
+        button.disabled = false;
+        button.textContent = 'Unfollow';
     }
 }
 
@@ -157,8 +245,8 @@ function getCookie(name) {
     return cookieValue;
 }
 </script>
+
 <style>
-  /* Layout for each author row */
   #authors-list .entry-list {
       list-style: none;
       margin: 0;
@@ -192,11 +280,6 @@ function getCookie(name) {
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-  }
-
-  #authors-list .entry-item-left .author-text p {
-      margin: 0;
-      color: #666;
   }
 
   #authors-list .entry-item button {

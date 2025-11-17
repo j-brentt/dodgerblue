@@ -182,38 +182,36 @@ from entries.models import Entry, Visibility, RemoteNode
 
 
 def send_entry_to_remote_followers(entry: Entry, request):
-    """Send freshly created/updated entries to any remote followers/friends."""
-    allowed_visibilities = {
-        Visibility.PUBLIC,
-        Visibility.FRIENDS,
-        Visibility.DELETED,
-        "DELETED",
-    }
-    if entry.visibility not in allowed_visibilities:
-        print(
-            f"[send_entry_to_remote_followers] Not sending entry {entry.id}: visibility={entry.visibility}"
-        )
+    """
+    Send a new/updated entry to remote followers, respecting visibility:
+
+    - PUBLIC  -> all remote followers
+    - UNLISTED -> all remote followers
+    - FRIENDS -> only remote mutual follows (friends)
+    """
+    # Don't federate deleted posts
+    if entry.visibility == Visibility.DELETED:
         return
 
     author = entry.author
     current_host = request.build_absolute_uri('/').rstrip('/')
 
-    # Followers on THIS node (DB)
+    # All APPROVED followers of this author (local + remote)
     followers_qs = FollowRequest.objects.filter(
         followee=author,
         status=FollowRequestStatus.APPROVED,
     ).select_related('follower')
 
-    author_following_ids = set(
+    # All authors this author is following (for mutual friend check)
+    following_ids = set(
         FollowRequest.objects.filter(
             follower=author,
             status=FollowRequestStatus.APPROVED,
         ).values_list('followee_id', flat=True)
     )
 
-    print(f"[send_entry_to_remote_followers] author={author.id} host={current_host} followers={followers_qs.count()}")
+    print(f"[send_entry_to_remote_followers] author={author.id} vis={entry.visibility} followers={followers_qs.count()}")
 
-    # URLs for this entry/author as seen from THIS node
     entry_api_url = request.build_absolute_uri(
         reverse("api:entry-detail", args=[entry.id])
     )
@@ -222,30 +220,27 @@ def send_entry_to_remote_followers(entry: Entry, request):
     for fr in followers_qs:
         follower: Author = fr.follower
 
-        # Safe host extraction
+        # Determine if this follower is a "friend" (mutual follow)
+        is_friend = follower.id in following_ids
+
+        # Visibility-based filtering:
+        if entry.visibility == Visibility.FRIENDS and not is_friend:
+            # friends-only: skip non-mutuals
+            print(f"[send_entry_to_remote_followers] skip {follower.id}: not a friend")
+            continue
+        # For PUBLIC and UNLISTED: any follower is OK, nothing extra to check
+
         host_value = getattr(follower, "host", "") or ""
         follower_host = host_value.rstrip('/')
 
-        print(f"[send_entry_to_remote_followers] follower={follower.id} host={follower_host!r}")
-
-        # Skip local followers (no host or same host as current node)
+        # Only send to remote followers (host set and not this node)
         if not follower_host or follower_host == current_host:
-            print(
-                f"[send_entry_to_remote_followers] -> skip follower={follower.id} (local or missing host)"
-            )
+            print(f"[send_entry_to_remote_followers] skip {follower.id}: local or missing host")
             continue
 
-        if entry.visibility in {Visibility.FRIENDS, "FRIENDS"} and follower.id not in author_following_ids:
-            print(
-                f"[send_entry_to_remote_followers] -> skip follower={follower.id} (not mutual friend)"
-            )
-            continue
-
-        # Build follower's author URL on THEIR node
         follower_author_url = f"{follower_host}/api/authors/{follower.id}"
         inbox_url = f"{follower_author_url}/inbox/"
 
-        # Match RemoteNode config
         remote_node = (
             RemoteNode.objects
             .filter(is_active=True)
@@ -254,7 +249,7 @@ def send_entry_to_remote_followers(entry: Entry, request):
         )
 
         if not remote_node:
-            print(f"[send_entry_to_remote_followers] -> no RemoteNode for host={follower_host}")
+            print(f"[send_entry_to_remote_followers] no RemoteNode for host={follower_host}")
             continue
 
         auth = HTTPBasicAuth(remote_node.username, remote_node.password) if remote_node.username else None
@@ -268,7 +263,7 @@ def send_entry_to_remote_followers(entry: Entry, request):
             "contentType": entry.content_type,
             "content": entry.content,
             "description": entry.description,
-            "visibility": entry.visibility,
+            "visibility": (entry.visibility or "").upper(),
             "published": (entry.published or timezone.now()).isoformat(),
             "author": {
                 "type": "author",
@@ -287,7 +282,6 @@ def send_entry_to_remote_followers(entry: Entry, request):
         except requests.RequestException as e:
             print(f"[send_entry_to_remote_followers] ERROR sending to {inbox_url}: {e}")
             continue
-
 
 
 class MyEntriesListView(generics.ListCreateAPIView):

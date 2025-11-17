@@ -313,3 +313,57 @@ def api_follow_author(request):
             return Response({
                 'detail': f'Connection error: {str(e)}'
             }, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+
+@api_view(['GET'])
+@drf_permission_classes([IsLocalUserOnly])
+def check_follow_status(request, author_id):
+    """
+    GET /api/authors/<uuid:author_id>/follow-status/
+    Check if the current user follows this author
+    """
+    try:
+        target_author = Author.objects.get(id=author_id)
+    except Author.DoesNotExist:
+        return Response({'status': 'not_following'}, status=status.HTTP_200_OK)
+    
+    follow_req = FollowRequest.objects.filter(
+        follower=request.user,
+        followee=target_author
+    ).first()
+    
+    if not follow_req:
+        status_value = 'not_following'
+    elif follow_req.status == FollowRequestStatus.APPROVED:
+        status_value = 'following'
+    elif follow_req.status == FollowRequestStatus.PENDING:
+        status_value = 'pending'
+    else:
+        status_value = 'not_following'
+    
+    return Response({'status': status_value})
+
+@api_view(['POST'])
+@drf_permission_classes([IsLocalUserOnly])
+def api_unfollow_author(request, author_id):
+    """
+    POST /api/authors/<uuid:author_id>/unfollow/
+    Unfollow an author (local or remote)
+    """
+    try:
+        target_author = Author.objects.get(id=author_id)
+    except Author.DoesNotExist:
+        return Response(
+            {'detail': 'Author not found'},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    
+    follow_req = FollowRequest.objects.filter(
+        follower=request.user,
+        followee=target_author
+    ).first()
+    
+    if follow_req:
+        follow_req.delete()
+        return Response({'detail': 'Unfollowed successfully'}, status=status.HTTP_200_OK)
+    
+    return Response({'detail': 'You are not following this author'}, status=status.HTTP_400_BAD_REQUEST)
