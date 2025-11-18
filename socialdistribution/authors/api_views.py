@@ -121,9 +121,8 @@ class ExploreAuthorsView(APIView):
             'all': local_serializer.data + remote_authors
         })
 
-
 @api_view(['POST'])
-@drf_permission_classes([IsLocalUserOnly])  # Only local users can follow
+@drf_permission_classes([IsLocalUserOnly])
 def api_follow_author(request):
     """
     POST /api/authors/follow/
@@ -142,7 +141,7 @@ def api_follow_author(request):
     # Check if it's a local follow (just the UUID) or remote (full URL)
     current_host = request.build_absolute_uri('/').rstrip('/')
     
-    # Handle if they sent just a UUID (from your existing UI)
+    # Handle if they sent just a UUID
     if not target_author_url.startswith('http'):
         # Local author by UUID
         try:
@@ -193,7 +192,9 @@ def api_follow_author(request):
         # REMOTE AUTHOR - send to their inbox
         from entries.models import RemoteNode
         
-        # Build current user's author URL manually (avoid reverse() issues)
+        print(f"[FOLLOW] Following remote author: {target_author_url}")
+        
+        # Build current user's author URL
         current_user_url = request.build_absolute_uri(f'/api/authors/{request.user.id}/')
         
         actor_data = {
@@ -225,35 +226,38 @@ def api_follow_author(request):
                 break
         
         if not remote_node:
+            print(f"[FOLLOW] No remote node configured for {target_author_url}")
             return Response(
                 {'detail': 'Remote node not configured'},
                 status=status.HTTP_400_BAD_REQUEST
             )
         
         try:
-            # Send to remote inbox
+            # ✅ FIX: Use YOUR global credentials for outgoing request
             auth = HTTPBasicAuth(settings.OUR_NODE_USERNAME, settings.OUR_NODE_PASSWORD)
-
+            
+            print(f"[FOLLOW] POSTing to {inbox_url}")
             response = requests.post(
                 inbox_url,
                 json=follow_request_data,
                 auth=auth,
                 timeout=10
             )
+            
+            print(f"[FOLLOW] Response: {response.status_code} - {response.text[:200]}")
 
             if response.ok:
-                # Store locally - extract UUID from the remote author URL
+                # Extract UUID from the remote author URL
                 try:
-                    # Extract UUID from the target URL
                     remote_uuid = target_author_url.split('/')[-1]
                     import uuid as uuid_module
-                    uuid_module.UUID(remote_uuid)  # Validate it's a UUID
+                    uuid_module.UUID(remote_uuid)
                 except (ValueError, IndexError):
                     return Response({
                         'detail': 'Invalid remote author UUID',
                     }, status=status.HTTP_400_BAD_REQUEST)
                 
-                # Fetch author info from remote node
+                # ✅ FIX: Fetch author info with YOUR credentials
                 try:
                     author_response = requests.get(
                         target_author_url,
@@ -270,14 +274,15 @@ def api_follow_author(request):
                         display_name = 'Remote Author'
                         github = ''
                         profile_image = ''
-                except:
+                except Exception as e:
+                    print(f"[FOLLOW] Error fetching author info: {e}")
                     display_name = 'Remote Author'
                     github = ''
                     profile_image = ''
     
                 # Store the remote author locally
                 remote_author, _ = Author.objects.get_or_create(
-                    id=remote_uuid,  # Use just the UUID
+                    id=remote_uuid,
                     defaults={
                         'username': f"remote_{remote_uuid[:20]}",
                         'display_name': display_name,
@@ -316,7 +321,7 @@ def api_follow_author(request):
             return Response({
                 'detail': f'Connection error: {str(e)}'
             }, status=status.HTTP_503_SERVICE_UNAVAILABLE)
-        
+                
 @api_view(['GET'])
 @drf_permission_classes([IsLocalUserOnly])
 def check_follow_status(request, author_id):

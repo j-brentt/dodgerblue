@@ -971,47 +971,13 @@ class InboxView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        # Extract UUID
-        try:
-            import uuid as uuid_module
-            uuid_str = remote_author_id.split('/')[-1]
-            uuid_module.UUID(uuid_str)
-            author_id_for_db = uuid_str
-        except (ValueError, IndexError, AttributeError):
-            return Response(
-                {'detail': f'Could not extract valid UUID from author ID: {remote_author_id}'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        # Normalize host
-        raw_host = (actor_data.get('host', '') or '').rstrip('/')
-        if raw_host.endswith('/api'):
-            base_host = raw_host[:-4]
-        else:
-            base_host = raw_host
-
-        # Get or create remote author with host
-        remote_author, created = Author.objects.get_or_create(
-            id=author_id_for_db,
-            defaults={
-                'username': actor_data.get('displayName', 'unknown').replace(' ', '_').lower()[:150],
-                'display_name': actor_data.get('displayName', 'Unknown'),
-                'github': actor_data.get('github', ''),
-                'profile_image': actor_data.get('profileImage', ''),
-                'is_active': False,
-                'host': base_host,
-            }
-        )
-        if not created and not getattr(remote_author, 'host', None) and base_host:
-            remote_author.host = base_host
-            remote_author.save(update_fields=['host'])
-        
-        # RECEIVER side: keep this PENDING so user can approve/deny
         follow_req, created = FollowRequest.objects.get_or_create(
-            follower=remote_author,
+            follower=remote_author,  
             followee=recipient,
             defaults={'status': FollowRequestStatus.PENDING}
         )
 
-        return Response({"detail": "Follow request received"}, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
-        
+        return Response(
+            {"detail": "Follow request received"}, 
+            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK
+        )
