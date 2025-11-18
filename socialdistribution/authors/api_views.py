@@ -257,7 +257,6 @@ def api_follow_author(request):
                         'detail': 'Invalid remote author UUID',
                     }, status=status.HTTP_400_BAD_REQUEST)
                 
-                # ✅ FIX: Fetch author info with YOUR credentials
                 try:
                     author_response = requests.get(
                         target_author_url,
