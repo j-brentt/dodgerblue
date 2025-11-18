@@ -24,6 +24,12 @@ from socialdistribution.authentication import RemoteNodeBasicAuthentication
 from typing import Optional
 from socialdistribution.permissions import IsAuthenticatedNodeOrLocalUser
 from django.conf import settings
+import requests
+from requests.auth import HTTPBasicAuth
+from django.utils import timezone
+from authors.models import FollowRequest, FollowRequestStatus, Author
+from entries.models import Entry, Visibility, RemoteNode
+
 
 def resolve_author_or_404(identifier: str) -> Author:
     decoded = unquote(identifier).strip()
@@ -254,14 +260,70 @@ class EntryDetailView(generics.RetrieveUpdateDestroyAPIView):
         entry = self.get_object(entry_id)
         serializer = EntrySerializer(entry, context={"request": request})
         return Response(serializer.data)
-
-import requests
-from requests.auth import HTTPBasicAuth
-from django.urls import reverse
-from django.utils import timezone
-from authors.models import FollowRequest, FollowRequestStatus, Author
-from entries.models import Entry, Visibility, RemoteNode
-
+    
+def send_like_to_author_inbox(entry: Entry, liker: Author, request):
+    """
+    Send a like object to the entry author's inbox if they're on a remote node.
+    """
+    author = entry.author
+    current_host = request.build_absolute_uri('/').rstrip('/')
+    author_host = (getattr(author, 'host', '') or '').rstrip('/')
+    
+    # Only send if author is on a remote node
+    if not author_host or author_host == current_host:
+        print(f"[LIKE] Author {author.id} is local, not sending to inbox")
+        return
+    
+    from entries.models import RemoteNode
+    
+    # Find the remote node
+    remote_node = None
+    for node in RemoteNode.objects.filter(is_active=True):
+        if author_host.startswith(node.base_url.rstrip('/')):
+            remote_node = node
+            break
+    
+    if not remote_node:
+        print(f"[LIKE] No remote node configured for host {author_host}")
+        return
+    
+    # Build URLs
+    entry_url = request.build_absolute_uri(reverse("api:entry-detail", args=[entry.id]))
+    liker_url = request.build_absolute_uri(f"/api/authors/{liker.id}/")
+    author_url = f"{author_host}/api/authors/{author.id}"
+    inbox_url = f"{author_url}/inbox/"
+    
+    # Build like object according to spec
+    like_object = {
+        "type": "Like",
+        "summary": f"{getattr(liker, 'display_name', liker.username)} likes your entry",
+        "author": {
+            "type": "author",
+            "id": liker_url,
+            "displayName": getattr(liker, 'display_name', None) or liker.username,
+            "host": request.build_absolute_uri('/api/'),
+            "github": getattr(liker, 'github', ''),
+            "profileImage": getattr(liker, 'profile_image', ''),
+        },
+        "object": entry_url
+    }
+    
+    # Send to remote inbox
+    try:
+        auth = HTTPBasicAuth(settings.OUR_NODE_USERNAME, settings.OUR_NODE_PASSWORD)
+        print(f"[LIKE] Sending like to {inbox_url}")
+        
+        response = requests.post(
+            inbox_url,
+            json=like_object,
+            auth=auth,
+            timeout=10
+        )
+        
+        print(f"[LIKE] Response: {response.status_code} - {response.text[:200]}")
+        
+    except requests.RequestException as e:
+        print(f"[LIKE] Error sending like to remote inbox: {e}")
 
 def send_entry_to_remote_followers(entry: Entry, request):
     """
@@ -457,8 +519,12 @@ class EntryLikeView(APIView):
                     status=status.HTTP_403_FORBIDDEN,
                 )
 
+        # Add the like locally
         entry.liked_by.add(request.user)
         likes_count = entry.liked_by.count()
+        
+        send_like_to_author_inbox(entry, request.user, request)
+        
         return Response(
             {"type": "Like", "likes": likes_count},
             status=status.HTTP_200_OK,
@@ -665,6 +731,76 @@ class AuthorLikedDetailView(LikeSerializerMixin, APIView):
         like_object = self._retrieve_like_object(request, like_id, expected_author_id=liker.id)
         return Response(like_object)
 
+def send_comment_to_author_inbox(comment: Comment, request):
+    """
+    Send a comment object to the entry author's inbox if they're on a remote node.
+    """
+    entry = comment.entry
+    author = entry.author
+    commenter = comment.author
+    
+    current_host = request.build_absolute_uri('/').rstrip('/')
+    author_host = (getattr(author, 'host', '') or '').rstrip('/')
+    
+    # Only send if author is on a remote node
+    if not author_host or author_host == current_host:
+        print(f"[COMMENT] Author {author.id} is local, not sending to inbox")
+        return
+    
+    from entries.models import RemoteNode
+    
+    # Find the remote node
+    remote_node = None
+    for node in RemoteNode.objects.filter(is_active=True):
+        if author_host.startswith(node.base_url.rstrip('/')):
+            remote_node = node
+            break
+    
+    if not remote_node:
+        print(f"[COMMENT] No remote node configured for host {author_host}")
+        return
+    
+    # Build URLs
+    comment_url = request.build_absolute_uri(reverse("api:comment-detail", args=[comment.id]))
+    entry_url = request.build_absolute_uri(reverse("api:entry-detail", args=[entry.id]))
+    commenter_url = request.build_absolute_uri(f"/api/authors/{commenter.id}/")
+    author_url = f"{author_host}/api/authors/{author.id}"
+    inbox_url = f"{author_url}/inbox/"
+    
+    # Build comment object according to spec
+    comment_object = {
+        "type": "comment",
+        "id": comment_url,
+        "author": {
+            "type": "author",
+            "id": commenter_url,
+            "displayName": getattr(commenter, 'display_name', None) or commenter.username,
+            "host": request.build_absolute_uri('/api/'),
+            "github": getattr(commenter, 'github', ''),
+            "profileImage": getattr(commenter, 'profile_image', ''),
+        },
+        "comment": comment.content,
+        "contentType": "text/plain",  
+        "published": comment.created_at.isoformat() if comment.created_at else timezone.now().isoformat(),
+        "entry": entry_url
+    }
+    
+    # Send to remote inbox
+    try:
+        auth = HTTPBasicAuth(settings.OUR_NODE_USERNAME, settings.OUR_NODE_PASSWORD)
+        print(f"[COMMENT] Sending comment to {inbox_url}")
+        
+        response = requests.post(
+            inbox_url,
+            json=comment_object,
+            auth=auth,
+            timeout=10
+        )
+        
+        print(f"[COMMENT] Response: {response.status_code} - {response.text[:200]}")
+        
+    except requests.RequestException as e:
+        print(f"[COMMENT] Error sending comment to remote inbox: {e}")
 
 class LikeDetailView(LikeSerializerMixin, APIView):
     '''
@@ -676,8 +812,6 @@ class LikeDetailView(LikeSerializerMixin, APIView):
     def get(self, request, like_id):
         like_object = self._retrieve_like_object(request, like_id)
         return Response(like_object)
-
-
 class EntryCommentsListCreateView(generics.ListCreateAPIView):
     """
     GET /api/entries/<entry_id>/comments/
@@ -719,8 +853,11 @@ class EntryCommentsListCreateView(generics.ListCreateAPIView):
         entry = self.get_entry()
         if not self.request.user.is_authenticated:
             raise Http404("Entry not found")
-        serializer.save(entry=entry, author=self.request.user)
-
+        
+        # Save the comment locally
+        comment = serializer.save(entry=entry, author=self.request.user)
+        
+        send_comment_to_author_inbox(comment, self.request)
 
 class CommentDetailView(generics.RetrieveAPIView):
     """
@@ -745,6 +882,55 @@ class CommentDetailView(generics.RetrieveAPIView):
             raise Http404("Comment not found")
         return comment
 
+def send_comment_like_to_author_inbox(comment: Comment, liker: Author, request):
+    """
+    Send a like object for a comment to the comment author's inbox if they're on a remote node.
+    """
+    comment_author = comment.author
+    current_host = request.build_absolute_uri('/').rstrip('/')
+    author_host = (getattr(comment_author, 'host', '') or '').rstrip('/')
+    
+    # Only send if author is on a remote node
+    if not author_host or author_host == current_host:
+        return
+    
+    from entries.models import RemoteNode
+    
+    remote_node = None
+    for node in RemoteNode.objects.filter(is_active=True):
+        if author_host.startswith(node.base_url.rstrip('/')):
+            remote_node = node
+            break
+    
+    if not remote_node:
+        return
+    
+    # Build URLs
+    comment_url = request.build_absolute_uri(reverse("api:comment-detail", args=[comment.id]))
+    liker_url = request.build_absolute_uri(f"/api/authors/{liker.id}/")
+    author_url = f"{author_host}/api/authors/{comment_author.id}"
+    inbox_url = f"{author_url}/inbox/"
+    
+    like_object = {
+        "type": "Like",
+        "summary": f"{getattr(liker, 'display_name', liker.username)} likes your comment",
+        "author": {
+            "type": "author",
+            "id": liker_url,
+            "displayName": getattr(liker, 'display_name', None) or liker.username,
+            "host": request.build_absolute_uri('/api/'),
+            "github": getattr(liker, 'github', ''),
+            "profileImage": getattr(liker, 'profile_image', ''),
+        },
+        "object": comment_url
+    }
+    
+    try:
+        auth = HTTPBasicAuth(settings.OUR_NODE_USERNAME, settings.OUR_NODE_PASSWORD)
+        response = requests.post(inbox_url, json=like_object, auth=auth, timeout=10)
+        print(f"[COMMENT_LIKE] Sent to {inbox_url}: {response.status_code}")
+    except requests.RequestException as e:
+        print(f"[COMMENT_LIKE] Error: {e}")
 
 class CommentLikeView(APIView):
     """
@@ -767,9 +953,11 @@ class CommentLikeView(APIView):
             raise Http404("Comment not found")
 
         comment.liked_by.add(request.user)
+        
+        send_comment_like_to_author_inbox(comment, request.user, request)
+        
         serializer = CommentSerializer(comment, context={"request": request})
         return Response(serializer.data, status=status.HTTP_200_OK)
-
 def render_markdown_entry(request, entry_id):
     """
     Renders the Markdown content of an entry into HTML.
