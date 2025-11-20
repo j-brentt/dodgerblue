@@ -1279,65 +1279,65 @@ class InboxView(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-def _handle_comment(self, recipient: Author, data: dict):
-    author_data = data.get("author") or {}
-    remote_author = _resolve_remote_author_from_data(author_data)
-    entry_url = (data.get("entry") or data.get("object") or "").rstrip("/")
-    comment_full_id = (data.get("id") or "").rstrip("/")
+    def _handle_comment(self, recipient: Author, data: dict):
+        author_data = data.get("author") or {}
+        remote_author = _resolve_remote_author_from_data(author_data)
+        entry_url = (data.get("entry") or data.get("object") or "").rstrip("/")
+        comment_full_id = (data.get("id") or "").rstrip("/")
 
-    if not remote_author or not entry_url or not comment_full_id:
-        return Response(
-            {"detail": "Missing required fields"},
-            status=status.HTTP_400_BAD_REQUEST,
+        if not remote_author or not entry_url or not comment_full_id:
+            return Response(
+                {"detail": "Missing required fields"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Target entry
+        parts = [p for p in entry_url.split("/") if p]
+        entry_id = parts[-1]
+
+        try:
+
+            entry = Entry.objects.get(id=entry_id)
+        except Entry.DoesNotExist:
+            return Response(
+                {"detail": "Entry not found"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        # Extract comment UUID
+        comment_id = comment_full_id.split("/")[-1]
+
+        import uuid as uuid_module
+        try:
+            uuid_module.UUID(comment_id)
+        except ValueError:
+            return Response(
+                {"detail": f"Invalid comment id: {comment_full_id}"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        comment, created = Comment.objects.update_or_create(
+            id=comment_id,
+            defaults={
+                "entry": entry,
+                "author": remote_author,
+                "content": data.get("comment", ""),
+                "content_type": data.get("contentType", "text/plain"),
+            },
         )
 
-    # Target entry
-    parts = [p for p in entry_url.split("/") if p]
-    entry_id = parts[-1]
-
-    try:
-
-        entry = Entry.objects.get(id=entry_id)
-    except Entry.DoesNotExist:
         return Response(
-            {"detail": "Entry not found"},
-            status=status.HTTP_404_NOT_FOUND,
+            {"detail": "Comment received", "id": str(comment.id)},
+            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
         )
-
-    # Extract comment UUID
-    comment_id = comment_full_id.split("/")[-1]
-
-    import uuid as uuid_module
-    try:
-        uuid_module.UUID(comment_id)
-    except ValueError:
-        return Response(
-            {"detail": f"Invalid comment id: {comment_full_id}"},
-            status=status.HTTP_400_BAD_REQUEST,
-        )
-
-    comment, created = Comment.objects.update_or_create(
-        id=comment_id,
-        defaults={
-            "entry": entry,
-            "author": remote_author,
-            "content": data.get("comment", ""),
-            "content_type": data.get("contentType", "text/plain"),
-        },
-    )
-
-    return Response(
-        {"detail": "Comment received", "id": str(comment.id)},
-        status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
-    )
 
 
     def _handle_follow(self, recipient: Author, data: dict):
         """
         Handle incoming follow request.
         Spec: type: 'follow', with:
-          - actor: follower (remote)
-          - object: followee (local recipient)
+        - actor: follower (remote)
+        - object: followee (local recipient)
         We only care about the actor here; URL path already tells us the followee.
         """
         actor_data = data.get("actor") or {}
