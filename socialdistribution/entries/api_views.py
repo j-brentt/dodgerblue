@@ -284,6 +284,104 @@ class EntryDetailView(generics.RetrieveUpdateDestroyAPIView):
         serializer = EntrySerializer(entry, context={"request": request})
         return Response(serializer.data)
     
+def send_comment_to_remote_followers(comment: Comment, request):
+    """
+    Send a comment object to all remote followers of the entry author,
+    respecting visibility (PUBLIC / FRIENDS).
+    """
+    entry = comment.entry
+    author = entry.author
+    commenter = comment.author
+
+    current_host = request.build_absolute_uri('/').rstrip('/')
+
+    # Followers of the entry author
+    followers_qs = FollowRequest.objects.filter(
+        followee=author,
+        status=FollowRequestStatus.APPROVED,
+    ).select_related("follower")
+
+    # For FRIENDS-only entries we need mutual follow (friends)
+    following_ids = set(
+        FollowRequest.objects.filter(
+            follower=author,
+            status=FollowRequestStatus.APPROVED,
+        ).values_list("followee_id", flat=True)
+    )
+
+    entry_api_url = request.build_absolute_uri(
+        reverse("api:entry-detail", args=[entry.id])
+    )
+    comment_api_url = request.build_absolute_uri(
+        reverse("api:comment-detail", args=[comment.id])
+    )
+    commenter_api_url = request.build_absolute_uri(
+        f"/api/authors/{commenter.id}/"
+    )
+
+    for fr in followers_qs:
+        follower: Author = fr.follower
+        is_friend = follower.id in following_ids
+
+        # FRIENDS visibility → only mutuals
+        if entry.visibility == Visibility.FRIENDS and not is_friend:
+            continue
+
+        host_value = getattr(follower, "host", "") or ""
+        follower_host = host_value.rstrip('/')
+
+        # Only send to remote followers
+        if not follower_host or follower_host == current_host:
+            continue
+
+        # Find RemoteNode config for that host
+        remote_node = (
+            RemoteNode.objects
+            .filter(is_active=True)
+            .filter(base_url__startswith=follower_host)
+            .first()
+        )
+        if not remote_node:
+            continue
+
+        follower_author_url = f"{follower_host}/api/authors/{follower.id}"
+        inbox_url = f"{follower_author_url}/inbox/"
+
+        comment_object = {
+            "type": "comment",
+            "id": comment_api_url,
+            "author": {
+                "type": "author",
+                "id": commenter_api_url,
+                "displayName": getattr(commenter, "display_name", None)
+                              or getattr(commenter, "username", ""),
+                "host": request.build_absolute_uri("/api/"),
+                "github": getattr(commenter, "github", "") or "",
+                "profileImage": getattr(commenter, "profile_image", "") or "",
+            },
+            "comment": comment.content,
+            "contentType": comment.content_type or "text/plain",
+            "published": (
+                comment.created_at.isoformat()
+                if comment.created_at else timezone.now().isoformat()
+            ),
+            "entry": entry_api_url,
+        }
+
+        try:
+            auth = HTTPBasicAuth(settings.OUR_NODE_USERNAME, settings.OUR_NODE_PASSWORD)
+            print(f"[COMMENT→FOLLOWERS] POST -> {inbox_url}")
+            resp = requests.post(
+                inbox_url,
+                json=comment_object,
+                auth=auth,
+                timeout=10,
+            )
+            print(f"[COMMENT→FOLLOWERS] <- {resp.status_code} {resp.text[:200]}")
+        except requests.RequestException as e:
+            print(f"[COMMENT→FOLLOWERS] ERROR sending to {inbox_url}: {e}")
+            continue
+ 
 def send_like_to_author_inbox(entry: Entry, liker: Author, request):
     """
     Send a like object to the entry author's inbox if they're on a remote node.
@@ -877,6 +975,16 @@ class EntryCommentsListCreateView(generics.ListCreateAPIView):
         entry = self.get_entry()
         if not self.request.user.is_authenticated:
             raise Http404("Entry not found")
+
+        # Save locally
+        comment = serializer.save(entry=entry, author=self.request.user)
+
+        # Notify remote post author (if the post author is remote)
+        send_comment_to_author_inbox(comment, self.request)
+
+        # Notify remote followers of this local author
+        send_comment_to_remote_followers(comment, self.request)
+
         
         # Save the comment locally
         comment = serializer.save(entry=entry, author=self.request.user)
