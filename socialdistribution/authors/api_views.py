@@ -10,7 +10,7 @@ from requests.auth import HTTPBasicAuth
 from authors.models import Author, FollowRequest, FollowRequestStatus
 from authors.serializers import AuthorSerializer
 from django.conf import settings
-from urllib.parse import unquote
+from urllib.parse import unquote, urlparse
 
 class AuthorDetailView(generics.RetrieveAPIView):
     """
@@ -69,27 +69,29 @@ class ExploreAuthorsView(APIView):
     Returns all local authors + authors from connected remote nodes
     Only accessible to local authenticated users (not remote nodes)
     """
+    # Only local users should access this endpoint
     permission_classes = [IsLocalUserOnly]
     
     def get(self, request):
         from entries.models import RemoteNode
         
-        # Local authors
+        # Get local authors using existing queryset logic
         local_authors = Author.objects.filter(
             is_active=True,
             is_approved=True,
         ).exclude(id=request.user.id).order_by("id")
         local_serializer = AuthorSerializer(local_authors, many=True, context={'request': request})
         
+        # Get remote authors from all connected nodes
         remote_authors = []
         connected_nodes = RemoteNode.objects.filter(is_active=True)
         
         for node in connected_nodes:
             try:
-                node_base = node.base_url.rstrip('/')  # e.g. "https://remote.example.com/api"
-                
+                node_base = node.base_url.rstrip('/')
+
                 response = requests.get(
-                    f"{node_base}/authors/",   # assuming their /api/authors/ lives under base_url
+                    f"{node_base}/api/authors/",
                     auth=HTTPBasicAuth(settings.OUR_NODE_USERNAME, settings.OUR_NODE_PASSWORD),
                     timeout=5
                 )
@@ -100,27 +102,50 @@ class ExploreAuthorsView(APIView):
                 data = response.json()
                 authors = data.get('authors', [])
 
+                filtered_authors = []
                 for author in authors:
-                    # Try to get a canonical ID URL for the author
+                    # Try host first (ActivityPub spec-style), then fall back to id/url
+                    host = (author.get('host') or '').rstrip('/')
                     author_id = (author.get('id') or author.get('url') or '').rstrip('/')
-                    if not author_id:
+
+                    # Decide if this author is "local" to that node:
+                    # 1. If host is present, use it
+                    # 2. Otherwise, fall back to id/url
+                    source_url = host or author_id
+                    if not source_url:
+                        continue  # can't determine, skip
+
+                    # Compare by scheme+netloc (so https://test.com and https://test.com/api/... match)
+                    parsed_node = urlparse(node_base)
+                    parsed_source = urlparse(source_url)
+
+                    same_origin = (
+                        parsed_node.scheme == parsed_source.scheme and
+                        parsed_node.netloc == parsed_source.netloc
+                    )
+                    if not same_origin:
+                        # This is a "remote of a remote" – skip it
                         continue
 
-                    # Only keep authors whose ID lives under this node's base_url
-                    # so that api_follow_author's startswith(node.base_url) logic will succeed.
-                    if not author_id.startswith(node_base):
-                        continue
-
+                    # At this point we've confirmed the author belongs to this node
                     author['_node_name'] = node.name
                     author['_is_remote'] = True
 
+                    # Ensure username exists - extract from displayName if missing
                     if not author.get('username'):
-                        display_name = author.get('displayName') or author.get('display_name', 'unknown')
+                        display_name = (
+                            author.get('displayName')
+                            or author.get('display_name')
+                            or 'unknown'
+                        )
                         author['username'] = display_name.lower().replace(' ', '_')
 
-                    remote_authors.append(author)
+                    filtered_authors.append(author)
+
+                remote_authors.extend(filtered_authors)
 
             except Exception as e:
+                # Log but don't fail if one node is down or misbehaving
                 print(f"Error fetching from {node.name}: {str(e)}")
                 continue
         
@@ -130,6 +155,7 @@ class ExploreAuthorsView(APIView):
             'remote': remote_authors,
             'all': local_serializer.data + remote_authors
         })
+
 
 @api_view(['POST'])
 @drf_permission_classes([IsLocalUserOnly])
@@ -243,6 +269,7 @@ def api_follow_author(request):
             )
         
         try:
+            
             auth = HTTPBasicAuth(settings.OUR_NODE_USERNAME, settings.OUR_NODE_PASSWORD)
             
             print(f"[FOLLOW] POSTing to {inbox_url}")
