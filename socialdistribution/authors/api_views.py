@@ -11,6 +11,8 @@ from authors.models import Author, FollowRequest, FollowRequestStatus
 from authors.serializers import AuthorSerializer
 from django.conf import settings
 from urllib.parse import unquote, urlparse
+from entries.models import RemoteNode
+
 
 class AuthorDetailView(generics.RetrieveAPIView):
     """
@@ -92,7 +94,7 @@ class ExploreAuthorsView(APIView):
 
                 response = requests.get(
                     f"{node_base}/api/authors/",
-                    auth=HTTPBasicAuth(settings.OUR_NODE_USERNAME, settings.OUR_NODE_PASSWORD),
+                    auth=HTTPBasicAuth(node.username, node.password),
                     timeout=5
                 )
                 
@@ -270,9 +272,10 @@ def api_follow_author(request):
         
         try:
             
-            auth = HTTPBasicAuth(settings.OUR_NODE_USERNAME, settings.OUR_NODE_PASSWORD)
+            auth = HTTPBasicAuth(remote_node.username, remote_node.password)
             
             print(f"[FOLLOW] POSTing to {inbox_url}")
+            print(f"[FOLLOW] Payload: {follow_request_data}")
             response = requests.post(
                 inbox_url,
                 json=follow_request_data,
@@ -296,10 +299,9 @@ def api_follow_author(request):
                 try:
                     author_response = requests.get(
                         target_author_url,
-                        auth=HTTPBasicAuth(settings.OUR_NODE_USERNAME, settings.OUR_NODE_PASSWORD),
+                        auth=HTTPBasicAuth(remote_node.username, remote_node.password),
                         timeout=5
                     )
-                    
                     if author_response.ok:
                         author_info = author_response.json()
                         display_name = author_info.get('displayName', 'Remote Author')
@@ -522,16 +524,23 @@ def followers_detail_api(request, author_id, foreign_author_fqid):
         github = ''
         profile_image = ''
         try:
-            resp = requests.get(
-                foreign_fqid,
-                auth=HTTPBasicAuth(settings.OUR_NODE_USERNAME, settings.OUR_NODE_PASSWORD),
-                timeout=5,
-            )
-            if resp.ok:
-                info = resp.json()
-                display_name = info.get('displayName', display_name)
-                github = info.get('github', github)
-                profile_image = info.get('profileImage', profile_image)
+            remote_node = None
+            for node in RemoteNode.objects.filter(is_active=True):
+                if foreign_fqid.startswith(node.base_url.rstrip('/')):
+                    remote_node = node
+                    break
+
+            if remote_node:
+                resp = requests.get(
+                    foreign_fqid,
+                    auth=HTTPBasicAuth(remote_node.username, remote_node.password),
+                    timeout=5,
+                )
+                if resp.ok:
+                    info = resp.json()
+                    display_name = info.get('displayName', display_name)
+                    github = info.get('github', github)
+                    profile_image = info.get('profileImage', profile_image)
         except Exception as e:
             print(f"[FOLLOWERS API] error fetching remote author info: {e}")
 

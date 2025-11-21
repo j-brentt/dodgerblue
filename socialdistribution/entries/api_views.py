@@ -369,7 +369,7 @@ def send_comment_to_remote_followers(comment: Comment, request):
         }
 
         try:
-            auth = HTTPBasicAuth(settings.OUR_NODE_USERNAME, settings.OUR_NODE_PASSWORD)
+            auth = HTTPBasicAuth(remote_node.username, remote_node.password)
             print(f"[COMMENT→FOLLOWERS] POST -> {inbox_url}")
             resp = requests.post(
                 inbox_url,
@@ -431,7 +431,7 @@ def send_like_to_author_inbox(entry: Entry, liker: Author, request):
     
     # Send to remote inbox
     try:
-        auth = HTTPBasicAuth(settings.OUR_NODE_USERNAME, settings.OUR_NODE_PASSWORD)
+        auth = HTTPBasicAuth(remote_node.username, remote_node.password)
         print(f"[LIKE] Sending like to {inbox_url}")
         
         response = requests.post(
@@ -517,7 +517,7 @@ def send_entry_to_remote_followers(entry: Entry, request):
             print(f"[send_entry_to_remote_followers] no RemoteNode for host={follower_host}")
             continue
 
-        auth = HTTPBasicAuth(settings.OUR_NODE_USERNAME, settings.OUR_NODE_PASSWORD)
+        auth = HTTPBasicAuth(remote_node.username, remote_node.password)
 
         payload = {
             "type": "entry",
@@ -909,7 +909,7 @@ def send_comment_to_author_inbox(comment: Comment, request):
     
     # Send to remote inbox
     try:
-        auth = HTTPBasicAuth(settings.OUR_NODE_USERNAME, settings.OUR_NODE_PASSWORD)
+        auth = HTTPBasicAuth(remote_node.username, remote_node.password)
         print(f"[COMMENT] Sending comment to {inbox_url}")
         
         response = requests.post(
@@ -1060,7 +1060,7 @@ def send_comment_like_to_author_inbox(comment: Comment, liker: Author, request):
     }
     
     try:
-        auth = HTTPBasicAuth(settings.OUR_NODE_USERNAME, settings.OUR_NODE_PASSWORD)
+        auth = HTTPBasicAuth(remote_node.username, remote_node.password)
         response = requests.post(inbox_url, json=like_object, auth=auth, timeout=10)
         print(f"[COMMENT_LIKE] Sent to {inbox_url}: {response.status_code}")
     except requests.RequestException as e:
