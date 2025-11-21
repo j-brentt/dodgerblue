@@ -10,6 +10,8 @@ urlpatterns = [
     path('authors/follow/', api_views.api_follow_author, name='api-follow'),
     path('authors/<uuid:author_id>/follow-status/', api_views.check_follow_status, name='follow-status'),
     path('authors/<uuid:author_id>/unfollow/', api_views.api_unfollow_author, name='api-unfollow'),
+
+    # Followers endpoints
     path(
         "authors/<uuid:author_id>/followers",
         followers_list_api,
@@ -20,4 +22,12 @@ urlpatterns = [
         followers_detail_api,
         name="followers-detail-api",
     ),
+
+    # Following endpoints
+    path("authors/<uuid:author_id>/following", 
+         api_views.following_list_api, 
+         name="following-list-api"),
+    path("authors/<uuid:author_id>/following/<path:foreign_author_fqid>", 
+         api_views.following_detail_api, 
+         name="following-detail-api"),
 ]

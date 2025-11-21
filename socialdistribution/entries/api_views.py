@@ -5,7 +5,7 @@ import base64
 import binascii
 from urllib.parse import unquote
 from django.shortcuts import get_object_or_404
-from django.http import Http404
+from django.http import Http404, HttpResponse
 from django.db.models import Q
 from django.urls import reverse
 from .models import Entry, Visibility, Comment, RemoteNode
@@ -25,6 +25,7 @@ from typing import Optional
 from socialdistribution.permissions import IsAuthenticatedNodeOrLocalUser
 from django.conf import settings
 import requests
+import mimetypes
 from requests.auth import HTTPBasicAuth
 from django.utils import timezone
 from authors.models import FollowRequest, FollowRequestStatus, Author
@@ -551,8 +552,8 @@ def send_entry_to_remote_followers(entry: Entry, request):
 
 class MyEntriesListView(generics.ListCreateAPIView):
     """
-    GET /api/author/<uuid:author_id>/entries/
-    POST /api/author/<uuid:author_id>/entries/
+    GET     [local, remote]  /api/authors/{AUTHOR_SERIAL}/entries/
+    POST    [local]         /api/authors/{AUTHOR_SERIAL}/entries/
     """
     serializer_class = EntrySerializer
     permission_classes = [permissions.IsAuthenticated]
@@ -653,7 +654,7 @@ class EntryLikeView(APIView):
 
 class EntryLikesListView(LikeSerializerMixin, APIView):
     """
-    GET /api/entries/<uuid:entry_id>/likes/
+    GET /api/entries/{ENTRY_FQID}/likes/
     Returns a paginated list of authors who liked the entry.
     """
     permission_classes = [permissions.AllowAny]
@@ -689,6 +690,27 @@ class EntryLikesListView(LikeSerializerMixin, APIView):
                 "src": src,
             }
         )
+    
+class EntryLikesFQIDView(LikeSerializerMixin, APIView):
+    """
+    GET [local] /api/entries/{ENTRY_FQID}/likes
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request, entry_fqid):
+        entry_id = entry_fqid.rstrip('/').split('/')[-1]
+        entry = get_object_or_404(Entry, id=entry_id)
+        
+        if not entry.can_view(request.user):
+            raise Http404("Entry not found")
+        
+        likes_qs = entry.liked_by.all()
+        src = [self._build_entry_like_object(request, entry, author) for author in likes_qs]
+        
+        return Response({
+            "type": "likes",
+            "src": src,
+        })
 
 
 class AuthorEntryLikesListView(LikeSerializerMixin, APIView):
@@ -934,6 +956,7 @@ class LikeDetailView(LikeSerializerMixin, APIView):
     def get(self, request, like_id):
         like_object = self._retrieve_like_object(request, like_id)
         return Response(like_object)
+    
 class EntryCommentsListCreateView(generics.ListCreateAPIView):
     """
     GET /api/entries/<entry_id>/comments/
@@ -992,6 +1015,33 @@ class EntryCommentsListCreateView(generics.ListCreateAPIView):
         
         send_comment_to_author_inbox(comment, self.request)
 
+class EntryCommentsFQIDView(generics.ListAPIView):
+    """
+    GET [local, remote] /api/entries/{ENTRY_FQID}/comments
+    """
+    serializer_class = CommentSerializer
+    permission_classes = [permissions.AllowAny]
+
+    def get_queryset(self):
+        entry_fqid = self.kwargs['entry_fqid']
+        entry_id = entry_fqid.rstrip('/').split('/')[-1]
+        
+        entry = get_object_or_404(Entry, id=entry_id)
+        
+        if not entry.can_view(self.request.user):
+            raise Http404("Entry not found")
+        
+        return entry.comments.select_related("author").order_by("created_at")
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        serializer = self.get_serializer(queryset, many=True)
+        
+        return Response({
+            "type": "comments",
+            "comments": serializer.data
+        })
+
 class CommentDetailView(generics.RetrieveAPIView):
     """
     GET /api/comments/<comment_id>/
@@ -1013,6 +1063,29 @@ class CommentDetailView(generics.RetrieveAPIView):
             and self.request.user != comment.author
         ):
             raise Http404("Comment not found")
+        return comment
+    
+class CommentFQIDView(generics.RetrieveAPIView):
+    """
+    GET [local, remote] /api/authors/{AUTHOR_SERIAL}/entries/{ENTRY_SERIAL}/comment/{REMOTE_COMMENT_FQID}
+    """
+    serializer_class = CommentSerializer
+    permission_classes = [permissions.AllowAny]
+
+    def get_object(self):
+        entry_id = self.kwargs['entry_id']
+        comment_fqid = unquote(self.kwargs['remote_comment_fqid'])
+        comment_id = comment_fqid.rstrip('/').split('/')[-1]
+        
+        comment = get_object_or_404(
+            Comment.objects.select_related('entry'),
+            id=comment_id,
+            entry__id=entry_id
+        )
+        
+        if not comment.entry.can_view(self.request.user):
+            raise Http404("Comment not found")
+        
         return comment
 
 def send_comment_like_to_author_inbox(comment: Comment, liker: Author, request):
@@ -1092,6 +1165,120 @@ class CommentLikeView(APIView):
         
         serializer = CommentSerializer(comment, context={"request": request})
         return Response(serializer.data, status=status.HTTP_200_OK)
+    
+class CommentedListView(generics.ListCreateAPIView):
+    """
+    GET /api/authors/{AUTHOR_SERIAL}/commented
+    POST /api/authors/{AUTHOR_SERIAL}/commented
+    """
+    serializer_class = CommentSerializer
+    permission_classes = [IsAuthenticatedNodeOrLocalUser]
+
+    def get_queryset(self):
+        author_id = self.kwargs['author_id']
+        author = get_object_or_404(Author, id=author_id)
+        
+        # For remote requests: only public + unlisted entries
+        if hasattr(self.request.user, 'node'):
+            return Comment.objects.filter(
+                author=author,
+                entry__visibility__in=[Visibility.PUBLIC, Visibility.UNLISTED]
+            ).select_related('entry', 'entry__author').order_by('-created_at')
+        
+        # For local requests: all comments
+        return Comment.objects.filter(
+            author=author
+        ).select_related('entry', 'entry__author').order_by('-created_at')
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        
+        # Pagination
+        page = max(1, int(request.query_params.get("page", 1)))
+        size = max(1, int(request.query_params.get("size", 10)))
+        start = (page - 1) * size
+        end = start + size
+        
+        page_qs = queryset[start:end]
+        serializer = self.get_serializer(page_qs, many=True)
+        
+        return Response(serializer.data)
+
+    def create(self, request, *args, **kwargs):
+        """
+        POST a comment object - forward to correct inbox
+        """
+        author_id = self.kwargs['author_id']
+        author = get_object_or_404(Author, id=author_id)
+        
+        # Must be authenticated as that author
+        if str(request.user.id) != str(author_id):
+            return Response(status=status.HTTP_403_FORBIDDEN)
+        
+        # Get entry from comment data
+        entry_url = request.data.get('entry', '').rstrip('/')
+        entry_id = entry_url.split('/')[-1]
+        
+        entry = get_object_or_404(Entry, id=entry_id)
+        
+        # Create comment locally
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        comment = serializer.save(entry=entry, author=author)
+        
+        # Forward to entry author's inbox if remote
+        send_comment_to_author_inbox(comment, request)
+        
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
+class CommentedFQIDListView(CommentedListView):
+    """
+    GET /api/authors/{AUTHOR_FQID}/commented
+    """
+    def get_queryset(self):
+        author_fqid = unquote(self.kwargs['author_fqid'])
+        author_id = author_fqid.rstrip('/').split('/')[-1]
+        author = get_object_or_404(Author, id=author_id)
+        
+        # Local node only knows about comments it has seen
+        return Comment.objects.filter(
+            author=author
+        ).select_related('entry', 'entry__author').order_by('-created_at')
+
+
+class CommentedDetailView(generics.RetrieveAPIView):
+    """
+    GET /api/authors/{AUTHOR_SERIAL}/commented/{COMMENT_SERIAL}
+    """
+    serializer_class = CommentSerializer
+    permission_classes = [IsAuthenticatedNodeOrLocalUser]
+
+    def get_object(self):
+        author_id = self.kwargs['author_id']
+        comment_id = self.kwargs['comment_id']
+        
+        return get_object_or_404(
+            Comment.objects.select_related('entry'),
+            id=comment_id,
+            author__id=author_id
+        )
+
+
+class CommentedFQIDDetailView(generics.RetrieveAPIView):
+    """
+    GET /api/commented/{COMMENT_FQID}
+    """
+    serializer_class = CommentSerializer
+    permission_classes = [permissions.AllowAny]
+
+    def get_object(self):
+        comment_fqid = unquote(self.kwargs['comment_fqid'])
+        comment_id = comment_fqid.rstrip('/').split('/')[-1]
+        
+        return get_object_or_404(Comment, id=comment_id)
+
+    
 def render_markdown_entry(request, entry_id):
     """
     Renders the Markdown content of an entry into HTML.
@@ -1107,6 +1294,83 @@ def render_markdown_entry(request, entry_id):
 
     # Return the rendered content as JSON
     return JsonResponse({"rendered_content": rendered_content})
+
+class EntryImageView(APIView):
+    """
+    GET [local, remote] /api/authors/{AUTHOR_SERIAL}/entries/{ENTRY_SERIAL}/image
+    Return the binary image if entry is an image type
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request, author_id, entry_id):
+        entry = get_object_or_404(Entry, id=entry_id, author__id=author_id)
+        
+        if not entry.can_view(request.user):
+            raise Http404("Entry not found")
+        
+        # Check if it's an image entry
+        if not entry.content_type or not entry.content_type.startswith('image/'):
+            return Response(
+                {"detail": "Entry is not an image"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Decode base64 content
+        try:
+            # Remove data URL prefix if present
+            content = entry.content
+            if ';base64,' in content:
+                content = content.split(';base64,')[1]
+            
+            image_data = base64.b64decode(content)
+            
+            # Determine content type
+            mime_type = entry.content_type.split(';')[0]
+            
+            return HttpResponse(image_data, content_type=mime_type)
+        except Exception as e:
+            return Response(
+                {"detail": f"Error decoding image: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+class EntryImageFQIDView(APIView):
+    """
+    GET [local, remote] /api/entries/{ENTRY_FQID}/image
+    Return the binary image by FQID
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request, entry_fqid):
+        # Extract UUID from FQID
+        entry_id = entry_fqid.rstrip('/').split('/')[-1]
+        
+        entry = get_object_or_404(Entry, id=entry_id)
+        
+        if not entry.can_view(request.user):
+            raise Http404("Entry not found")
+        
+        if not entry.content_type or not entry.content_type.startswith('image/'):
+            return Response(
+                {"detail": "Entry is not an image"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        try:
+            content = entry.content
+            if ';base64,' in content:
+                content = content.split(';base64,')[1]
+            
+            image_data = base64.b64decode(content)
+            mime_type = entry.content_type.split(';')[0]
+            
+            return HttpResponse(image_data, content_type=mime_type)
+        except Exception as e:
+            return Response(
+                {"detail": f"Error decoding image: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
 class InboxView(APIView):
     """
     POST /api/authors/{AUTHOR_ID}/inbox/
@@ -1359,3 +1623,30 @@ class InboxView(APIView):
             {"detail": "Follow request received"},
             status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
         )
+
+class FollowRequestsListView(APIView):
+    """
+    GET /api/authors/{AUTHOR_SERIAL}/follow_requests
+    Returns pending follow requests for the author
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request, author_id):
+        author = get_object_or_404(Author, id=author_id)
+        
+        # Must be that author
+        if str(request.user.id) != str(author_id):
+            return Response(status=status.HTTP_403_FORBIDDEN)
+        
+        pending_requests = FollowRequest.objects.filter(
+            followee=author,
+            status=FollowRequestStatus.PENDING
+        ).select_related('follower')
+        
+        followers = [fr.follower for fr in pending_requests]
+        data = AuthorSerializer(followers, many=True, context={'request': request}).data
+        
+        return Response({
+            "type": "follow",
+            "requests": data
+        })

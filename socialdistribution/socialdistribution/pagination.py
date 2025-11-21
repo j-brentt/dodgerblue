@@ -7,5 +7,6 @@ Class to allow for custom page_size params from API endpoints
 """
 class CustomPageNumberPagination(PageNumberPagination):
     page_size = 10  # default
-    page_size_query_param = 'page_size'  # customizable page size
+    page_size_query_param = 'size'  # customizable page size
     max_page_size = 100  # page size limit
+    page_query_param = 'page'  # page number param

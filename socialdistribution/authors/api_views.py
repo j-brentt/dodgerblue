@@ -4,6 +4,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from socialdistribution.permissions import IsAuthenticatedNode, IsAuthenticatedNodeOrLocalUser, IsLocalUserOnly
 from socialdistribution.authentication import RemoteNodeBasicAuthentication  
+from socialdistribution.pagination import CustomPageNumberPagination
 from django.urls import reverse
 import requests
 from requests.auth import HTTPBasicAuth
@@ -14,7 +15,7 @@ from urllib.parse import unquote
 
 class AuthorDetailView(generics.RetrieveAPIView):
     """
-    GET /api/author/<id>/
+    GET /api/authors/<id>/
     Used to retrieve the author details and serialize them
     Accessible to both remote nodes and local users (public data)
     """
@@ -41,7 +42,7 @@ class AuthorListView(generics.ListAPIView):
    
     authentication_classes = [RemoteNodeBasicAuthentication]
     permission_classes = [IsAuthenticatedNodeOrLocalUser]  
-    pagination_class = None  # Disable pagination for simplicity
+    pagination_class = CustomPageNumberPagination
     def get_queryset(self):
         return Author.objects.filter(
             is_active=True,
@@ -54,13 +55,17 @@ class AuthorListView(generics.ListAPIView):
             print(f"Remote node {request.user.node.name} accessing authors list")
         
         queryset = self.get_queryset()
-        serializer = self.get_serializer(queryset, many=True)
-        authors = serializer.data
 
-        # Spec-compliant shape
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        
+        # If pagination is somehow disabled, fallback to this:
+        serializer = self.get_serializer(queryset, many=True)
         return Response({
             "type": "authors",
-            "authors": authors,
+            "authors": serializer.data,
         })
 
 class ExploreAuthorsView(APIView):
@@ -569,4 +574,234 @@ def followers_detail_api(request, author_id, foreign_author_fqid):
 
         # Deny / revoke by marking REJECTED
         follow_req.reject()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+@api_view(['GET'])
+@drf_permission_classes([IsLocalUserOnly])
+def following_list_api(request, author_id):
+    """
+    GET /api/authors/{AUTHOR_SERIAL}/following
+    Returns list of authors that AUTHOR_SERIAL is following
+    """
+    try:
+        local_author = Author.objects.get(id=author_id)
+    except Author.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    if str(request.user.id) != str(author_id):
+        return Response(status=status.HTTP_403_FORBIDDEN)
+
+    follow_qs = FollowRequest.objects.filter(
+        follower=local_author,
+        status=FollowRequestStatus.APPROVED,
+    ).select_related("followee")
+
+    following = [fr.followee for fr in follow_qs]
+    data = AuthorSerializer(following, many=True, context={'request': request}).data
+
+    return Response({
+        "type": "following",
+        "following": data,
+    }, status=status.HTTP_200_OK)
+
+@api_view(['GET', 'PUT', 'DELETE'])
+@drf_permission_classes([IsLocalUserOnly])
+def following_detail_api(request, author_id, foreign_author_fqid):
+    """
+    /api/authors/{AUTHOR_SERIAL}/following/{FOREIGN_AUTHOR_FQID}
+
+    GET    [local]: check if AUTHOR_SERIAL is following FOREIGN_AUTHOR_FQID
+                    -> 200 with author if following, 404 otherwise
+    PUT    [local]: AUTHOR_SERIAL generates follow request for FOREIGN_AUTHOR_FQID
+                    -> Creates FollowRequest and POSTs to remote inbox if needed
+    DELETE [local]: AUTHOR_SERIAL unfollows FOREIGN_AUTHOR_FQID
+                    -> Removes the follow relationship
+    """
+    try:
+        local_author = Author.objects.get(id=author_id)
+    except Author.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    # Must be authenticated as that author
+    if str(request.user.id) != str(author_id):
+        return Response(status=status.HTTP_403_FORBIDDEN)
+
+    foreign_fqid = unquote(foreign_author_fqid).rstrip('/')
+
+    # Helper: resolve FQID to Author (reuse your existing logic)
+    def get_or_create_foreign_author():
+        if not foreign_fqid:
+            return None
+
+        # Bare UUID / local serial
+        if not foreign_fqid.startswith('http'):
+            try:
+                return Author.objects.get(id=foreign_fqid)
+            except Author.DoesNotExist:
+                return None
+
+        current_api_root = request.build_absolute_uri('/api/').rstrip('/')
+
+        # Local full API URL
+        if foreign_fqid.startswith(current_api_root):
+            foreign_id = foreign_fqid.rstrip('/').split('/')[-1]
+            try:
+                return Author.objects.get(id=foreign_id)
+            except Author.DoesNotExist:
+                return None
+
+        # Remote FQID
+        remote_serial = foreign_fqid.rstrip('/').split('/')[-1]
+        try:
+            import uuid as uuid_module
+            uuid_module.UUID(remote_serial)
+        except (ValueError, IndexError):
+            return None
+
+        # Fetch remote author info
+        display_name = 'Remote Author'
+        github = ''
+        profile_image = ''
+        try:
+            resp = requests.get(
+                foreign_fqid,
+                auth=HTTPBasicAuth(settings.OUR_NODE_USERNAME, settings.OUR_NODE_PASSWORD),
+                timeout=5,
+            )
+            if resp.ok:
+                info = resp.json()
+                display_name = info.get('displayName', display_name)
+                github = info.get('github', github)
+                profile_image = info.get('profileImage', profile_image)
+        except Exception as e:
+            print(f"[FOLLOWING API] Error fetching remote author: {e}")
+
+        # Derive host from FQID
+        host = None
+        idx = foreign_fqid.find('/api/')
+        if idx != -1:
+            host = foreign_fqid[:idx+5]
+
+        foreign_author, _ = Author.objects.get_or_create(
+            id=remote_serial,
+            defaults={
+                "username": f"remote_{remote_serial[:20]}",
+                "display_name": display_name,
+                "github": github,
+                "profile_image": profile_image,
+                "host": host,
+                "is_active": False,
+            },
+        )
+        return foreign_author
+
+    foreign_author = get_or_create_foreign_author()
+
+    # For GET/DELETE we need a valid foreign author
+    if request.method in ['GET', 'DELETE'] and not foreign_author:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    follow_req = None
+    if foreign_author:
+        follow_req = FollowRequest.objects.filter(
+            follower=local_author,
+            followee=foreign_author,
+        ).first()
+
+    # ---------- GET: check if following ----------
+    if request.method == 'GET':
+        if not follow_req or follow_req.status != FollowRequestStatus.APPROVED:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
+        data = AuthorSerializer(foreign_author, context={'request': request}).data
+        return Response(data, status=status.HTTP_200_OK)
+
+    # ---------- PUT: create/send follow request ----------
+    if request.method == 'PUT':
+        from entries.models import RemoteNode
+        
+        # Check if foreign author is remote
+        current_host = request.build_absolute_uri('/api/').rstrip('/')
+        is_remote = foreign_fqid.startswith('http') and not foreign_fqid.startswith(current_host)
+
+        if is_remote:
+            # Send to remote inbox
+            if not foreign_author:
+                foreign_author = get_or_create_foreign_author()
+                if not foreign_author:
+                    return Response({'detail': 'Cannot resolve foreign author'}, status=status.HTTP_400_BAD_REQUEST)
+
+            actor_data = {
+                'type': 'author',
+                'id': request.build_absolute_uri(f'/api/authors/{local_author.id}/'),
+                'displayName': local_author.display_name or local_author.username,
+                'host': request.build_absolute_uri('/api/'),
+                'github': local_author.github or '',
+                'profileImage': local_author.profile_image or '',
+            }
+
+            follow_request_data = {
+                'type': 'follow',
+                'summary': f"{actor_data['displayName']} wants to follow you",
+                'actor': actor_data,
+                'object': {
+                    'type': 'author',
+                    'id': foreign_fqid,
+                }
+            }
+
+            inbox_url = f"{foreign_fqid}/inbox/"
+
+            try:
+                response = requests.post(
+                    inbox_url,
+                    json=follow_request_data,
+                    auth=HTTPBasicAuth(settings.OUR_NODE_USERNAME, settings.OUR_NODE_PASSWORD),
+                    timeout=10
+                )
+
+                if response.ok:
+                    # Create/update local record as APPROVED (remote follows are instant on our side)
+                    follow_req, created = FollowRequest.objects.get_or_create(
+                        follower=local_author,
+                        followee=foreign_author,
+                        defaults={'status': FollowRequestStatus.APPROVED},
+                    )
+                    if not created and follow_req.status != FollowRequestStatus.APPROVED:
+                        follow_req.status = FollowRequestStatus.APPROVED
+                        follow_req.save()
+
+                    data = AuthorSerializer(foreign_author, context={'request': request}).data
+                    return Response(data, status=status.HTTP_200_OK)
+                else:
+                    return Response({
+                        'detail': 'Failed to send to remote node',
+                        'remote_status': response.status_code
+                    }, status=status.HTTP_502_BAD_GATEWAY)
+
+            except requests.exceptions.RequestException as e:
+                return Response({
+                    'detail': f'Connection error: {str(e)}'
+                }, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+
+        else:
+            # Local follow request
+            if not foreign_author:
+                return Response({'detail': 'Author not found'}, status=status.HTTP_404_NOT_FOUND)
+
+            follow_req, created = FollowRequest.objects.get_or_create(
+                follower=local_author,
+                followee=foreign_author,
+                defaults={'status': FollowRequestStatus.PENDING}
+            )
+
+            data = AuthorSerializer(foreign_author, context={'request': request}).data
+            return Response(data, status=status.HTTP_200_OK)
+
+    # ---------- DELETE: unfollow ----------
+    if request.method == 'DELETE':
+        if not follow_req:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
+        follow_req.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
