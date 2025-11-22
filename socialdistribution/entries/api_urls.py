@@ -54,5 +54,7 @@ urlpatterns = [
     path('entries/<uuid:entry_id>/rendered/', render_markdown_entry, name='entry-rendered'),
 
     path("authors/<uuid:author_id>/inbox/", InboxView.as_view(), name="author-inbox"),
+    path("authors/<uuid:author_id>/inbox", InboxView.as_view(), name="author-inbox-no-slash"),
+
 
 ]
