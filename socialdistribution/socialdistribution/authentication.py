@@ -3,50 +3,56 @@ from rest_framework import exceptions
 from entries.models import RemoteNode
 
 
-from rest_framework import authentication
-from rest_framework import exceptions
-from entries.models import RemoteNode
-from django.conf import settings
-
-
 class RemoteNodeBasicAuthentication(authentication.BasicAuthentication):
     """
     Custom HTTP Basic Authentication for remote nodes.
-    Validates credentials against our universal node credentials.
+    Validates credentials against RemoteNode entries in the database.
     """
 
     def authenticate_credentials(self, userid, password, request=None):
         """
-        Authenticate the userid and password against our node credentials.
-        
+        Authenticate the userid and password against RemoteNode entries.
+        Any active RemoteNode with matching credentials is allowed.
         """
         print(f"[AUTH] Incoming auth attempt:")
         print(f"[AUTH] Received userid: {userid}")
         print(f"[AUTH] Received password: {password}")
-        print(f"[AUTH] Expected userid: {settings.OUR_NODE_USERNAME}")
-        print(f"[AUTH] Expected password: {settings.OUR_NODE_PASSWORD}")
-        print(f"[AUTH] Match: {userid == settings.OUR_NODE_USERNAME and password == settings.OUR_NODE_PASSWORD}")
-        
-        if userid != settings.OUR_NODE_USERNAME or password != settings.OUR_NODE_PASSWORD:
+
+        # Look for a RemoteNode with matching credentials
+        try:
+            node = RemoteNode.objects.get(
+                username=userid,
+                password=password,
+                is_active=True
+            )
+            print(f"[AUTH] Match found: {node.host}")
+            return (NodeUser(node), None)
+        except RemoteNode.DoesNotExist:
+            print(f"[AUTH] No matching RemoteNode found")
+            
+            # Log all active nodes for debugging
+            print(f"[AUTH] Active RemoteNodes in database:")
+            for n in RemoteNode.objects.filter(is_active=True):
+                print(f"[AUTH]   - {n.host}: {n.username}:{n.password}")
+            
             raise exceptions.AuthenticationFailed('Invalid node credentials')
-        
-        return (NodeUser(), None)
 
 
 class NodeUser:
     """
     A simple user-like object to represent an authenticated remote node.
-    This allows us to use Django's authentication system with nodes.
     """
-    def __init__(self):
-        self.username = "remote_node"
+
+    def __init__(self, node=None):
+        self.node = node
+        self.username = node.host if node else "remote_node"
         self.is_authenticated = True
         self.is_active = True
-        self.pk = "node"
-        self.id = "node"
+        self.pk = node.pk if node else "node"
+        self.id = node.pk if node else "node"
 
     def __str__(self):
-        return "Remote Node"
+        return f"Remote Node: {self.username}"
 
     @property
     def is_anonymous(self):
