@@ -1118,6 +1118,16 @@ class InboxView(APIView):
 
     def post(self, request, author_id):
         # Recipient is the local author who owns this inbox
+        print(f"\n{'='*60}")
+        print(f"[INBOX] ===== INCOMING REQUEST =====")
+        print(f"[INBOX] Author ID (recipient): {author_id}")
+        print(f"[INBOX] Request method: {request.method}")
+        print(f"[INBOX] Content-Type: {request.content_type}")
+        print(f"[INBOX] Auth header present: {'Authorization' in request.headers}")
+        print(f"[INBOX] Remote user: {getattr(request, 'user', 'N/A')}")
+        print(f"[INBOX] Raw data type: {type(request.data)}")
+        print(f"[INBOX] Raw data: {request.data}")
+        print(f"{'='*60}\n")
         try:
             recipient = Author.objects.get(id=author_id)
         except Author.DoesNotExist:
