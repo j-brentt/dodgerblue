@@ -136,47 +136,40 @@ class EntrySerializer(serializers.ModelSerializer):
 
 
 class CommentSerializer(serializers.ModelSerializer):
+    """Serializer for comment objects exposed via the API."""
+
     type = serializers.CharField(default="comment", read_only=True)
     id = serializers.SerializerMethodField()
-    author = serializers.SerializerMethodField()
-    comment = serializers.CharField(source="content")
-    contentType = serializers.CharField(source="content_type", default="text/plain")
-    published = serializers.DateTimeField(source="created_at", read_only=True)
     entry = serializers.SerializerMethodField()
-    web = serializers.SerializerMethodField()
-
+    author = AuthorSerializer(read_only=True)
+    published = serializers.DateTimeField(source="created_at", read_only=True)
+    likes = serializers.SerializerMethodField()
+    contentType = serializers.CharField(source="content_type")
+    comment = serializers.CharField(source="content")
     class Meta:
         model = Comment
-        fields = ["type", "id", "author", "comment", "contentType", "published", "entry", "web"]
+        fields = [
+            "type",
+            "id",
+            "entry",
+            "author",
+            "comment",
+            "contentType",
+            "published",
+            "likes",
+        ]
 
     def get_id(self, obj):
-        """Returns the full API URL for this comment via commented endpoint"""
         request = self.context.get("request")
         if request:
-            return request.build_absolute_uri(
-                f"/api/authors/{obj.author.id}/commented/{obj.id}"
-            )
-        return f"http://localhost:8000/api/authors/{obj.author.id}/commented/{obj.id}"
-
-    def get_author(self, obj):
-        """Returns full author object per spec"""
-        from authors.serializers import AuthorSerializer
-        request = self.context.get("request")
-        return AuthorSerializer(obj.author, context={"request": request}).data
+            return request.build_absolute_uri(reverse("api:comment-detail", args=[obj.id]))
+        return str(obj.id)
 
     def get_entry(self, obj):
-        """Returns the full entry URL"""
         request = self.context.get("request")
         if request:
-            return request.build_absolute_uri(
-                f"/api/authors/{obj.entry.author.id}/entries/{obj.entry.id}/"
-            )
-        return f"http://localhost:8000/api/authors/{obj.entry.author.id}/entries/{obj.entry.id}/"
+            return request.build_absolute_uri(reverse("api:entry-detail", args=[obj.entry_id]))
+        return str(obj.entry_id)
 
-    def get_web(self, obj):
-        """Returns HTML URL to view the entry (where comment appears)"""
-        request = self.context.get("request")
-        if request:
-            # Could also be a dedicated comment view URL if you have one
-            return request.build_absolute_uri(f"/entries/{obj.entry.id}/")
-        return f"http://localhost:8000/entries/{obj.entry.id}/"
+    def get_likes(self, obj):
+        return obj.likes_count

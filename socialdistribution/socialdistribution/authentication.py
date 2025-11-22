@@ -33,27 +33,6 @@ class RemoteNodeBasicAuthentication(authentication.BasicAuthentication):
         return (NodeUser(), None)
 
 
-class HybridAuthentication(authentication.SessionAuthentication):
-    """
-    Tries session auth first (for local users),
-    then falls back to RemoteNodeBasicAuthentication (for remote nodes).
-    
-    This allows endpoints to accept BOTH:
-    - Local users authenticated via Django session cookies
-    - Remote nodes authenticated via HTTP Basic Auth
-    """
-    
-    def authenticate(self, request):
-        # Try session auth first (local users)
-        user_auth_tuple = super().authenticate(request)
-        if user_auth_tuple is not None:
-            return user_auth_tuple
-        
-        # Fall back to remote node basic auth
-        remote_auth = RemoteNodeBasicAuthentication()
-        return remote_auth.authenticate(request)
-
-
 class NodeUser:
     """
     A simple user-like object to represent an authenticated remote node.
