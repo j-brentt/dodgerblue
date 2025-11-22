@@ -373,7 +373,7 @@ def send_comment_to_remote_followers(comment: Comment, request):
         }
 
         try:
-            auth = HTTPBasicAuth(settings.OUR_NODE_USERNAME, settings.OUR_NODE_PASSWORD)
+            auth = HTTPBasicAuth(remote_node.username, remote_node.password)
             print(f"[COMMENT→FOLLOWERS] POST -> {inbox_url}")
             resp = requests.post(
                 inbox_url,
@@ -435,7 +435,7 @@ def send_like_to_author_inbox(entry: Entry, liker: Author, request):
     
     # Send to remote inbox
     try:
-        auth = HTTPBasicAuth(settings.OUR_NODE_USERNAME, settings.OUR_NODE_PASSWORD)
+        auth = HTTPBasicAuth(remote_node.username, remote_node.password)
         print(f"[LIKE] Sending like to {inbox_url}")
         
         response = requests.post(
@@ -521,7 +521,7 @@ def send_entry_to_remote_followers(entry: Entry, request):
             print(f"[send_entry_to_remote_followers] no RemoteNode for host={follower_host}")
             continue
 
-        auth = HTTPBasicAuth(settings.OUR_NODE_USERNAME, settings.OUR_NODE_PASSWORD)
+        auth = HTTPBasicAuth(remote_node.username, remote_node.password)
 
         payload = {
             "type": "entry",
@@ -1146,7 +1146,7 @@ def send_comment_to_author_inbox(comment: Comment, request):
     
     # Send to remote inbox
     try:
-        auth = HTTPBasicAuth(settings.OUR_NODE_USERNAME, settings.OUR_NODE_PASSWORD)
+        auth = HTTPBasicAuth(remote_node.username, remote_node.password)
         print(f"[COMMENT] Sending comment to {inbox_url}")
         
         response = requests.post(
@@ -1361,7 +1361,7 @@ def send_comment_like_to_author_inbox(comment: Comment, liker: Author, request):
     }
     
     try:
-        auth = HTTPBasicAuth(settings.OUR_NODE_USERNAME, settings.OUR_NODE_PASSWORD)
+        auth = HTTPBasicAuth(remote_node.username, remote_node.password)
         response = requests.post(inbox_url, json=like_object, auth=auth, timeout=10)
         print(f"[COMMENT_LIKE] Sent to {inbox_url}: {response.status_code}")
     except requests.RequestException as e:
@@ -1912,25 +1912,31 @@ class InboxView(APIView):
     def _handle_follow(self, recipient: Author, data: dict):
         """
         Handle incoming follow request.
-        Spec: type: 'follow', with:
-        - actor: follower (remote)
-        - object: followee (local recipient)
-        We only care about the actor here; URL path already tells us the followee.
         """
+        print(f"[INBOX FOLLOW] Received data: {data}")
+        
         actor_data = data.get("actor") or {}
+        print(f"[INBOX FOLLOW] Actor data: {actor_data}")
+        
         remote_author = _resolve_remote_author_from_data(actor_data)
+        print(f"[INBOX FOLLOW] Resolved remote author: {remote_author}")
 
         if not remote_author:
+            print(f"[INBOX FOLLOW] Failed to resolve remote author!")
             return Response(
                 {"detail": "Missing or invalid actor"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        print(f"[INBOX FOLLOW] Creating FollowRequest: follower={remote_author.id}, followee={recipient.id}")
+        
         fr, created = FollowRequest.objects.get_or_create(
             follower=remote_author,
             followee=recipient,
             defaults={"status": FollowRequestStatus.PENDING},
         )
+        
+        print(f"[INBOX FOLLOW] FollowRequest created={created}, status={fr.status}")
 
         return Response(
             {"detail": "Follow request received"},

@@ -12,7 +12,9 @@ from requests.auth import HTTPBasicAuth
 from authors.models import Author, FollowRequest, FollowRequestStatus
 from authors.serializers import AuthorSerializer
 from django.conf import settings
-from urllib.parse import unquote
+from urllib.parse import unquote, urlparse
+from entries.models import RemoteNode
+
 
 class AuthorDetailView(generics.RetrieveUpdateAPIView):
     """
@@ -153,30 +155,64 @@ class ExploreAuthorsView(APIView):
         
         for node in connected_nodes:
             try:
-                # Use the existing /api/authors/ endpoint on remote nodes
+                node_base = node.base_url.rstrip('/')
+
                 response = requests.get(
-                    f"{node.base_url.rstrip('/')}/api/authors/",
-                    auth=HTTPBasicAuth(settings.OUR_NODE_USERNAME, settings.OUR_NODE_PASSWORD),
+                    f"{node_base}/api/authors/",
+                    auth=HTTPBasicAuth(node.username, node.password),
                     timeout=5
                 )
                 
-                if response.ok:
-                    data = response.json()
-                    # Spec says response should have "authors" key
-                    authors = data.get('authors', [])
-                    
-                    # Add node info to each author for display
-                    for author in authors:
-                        author['_node_name'] = node.name
-                        author['_is_remote'] = True
-                        # Ensure username exists - extract from displayName if missing
-                        if not author.get('username'):
-                            display_name = author.get('displayName') or author.get('display_name', 'unknown')
-                            author['username'] = display_name.lower().replace(' ', '_')
-                    
-                    remote_authors.extend(authors)
+                if not response.ok:
+                    continue
+
+                data = response.json()
+                authors = data.get('authors', [])
+
+                filtered_authors = []
+                for author in authors:
+                    # Try host first (ActivityPub spec-style), then fall back to id/url
+                    host = (author.get('host') or '').rstrip('/')
+                    author_id = (author.get('id') or author.get('url') or '').rstrip('/')
+
+                    # Decide if this author is "local" to that node:
+                    # 1. If host is present, use it
+                    # 2. Otherwise, fall back to id/url
+                    source_url = host or author_id
+                    if not source_url:
+                        continue  # can't determine, skip
+
+                    # Compare by scheme+netloc (so https://test.com and https://test.com/api/... match)
+                    parsed_node = urlparse(node_base)
+                    parsed_source = urlparse(source_url)
+
+                    same_origin = (
+                        parsed_node.scheme == parsed_source.scheme and
+                        parsed_node.netloc == parsed_source.netloc
+                    )
+                    if not same_origin:
+                        # This is a "remote of a remote" – skip it
+                        continue
+
+                    # At this point we've confirmed the author belongs to this node
+                    author['_node_name'] = node.name
+                    author['_is_remote'] = True
+
+                    # Ensure username exists - extract from displayName if missing
+                    if not author.get('username'):
+                        display_name = (
+                            author.get('displayName')
+                            or author.get('display_name')
+                            or 'unknown'
+                        )
+                        author['username'] = display_name.lower().replace(' ', '_')
+
+                    filtered_authors.append(author)
+
+                remote_authors.extend(filtered_authors)
+
             except Exception as e:
-                # Log but don't fail if one node is down
+                # Log but don't fail if one node is down or misbehaving
                 print(f"Error fetching from {node.name}: {str(e)}")
                 continue
         
@@ -186,6 +222,7 @@ class ExploreAuthorsView(APIView):
             'remote': remote_authors,
             'all': local_serializer.data + remote_authors
         })
+
 
 @api_view(['POST'])
 @drf_permission_classes([IsLocalUserOnly])
@@ -299,10 +336,11 @@ def api_follow_author(request):
             )
         
         try:
-            # ✅ FIX: Use YOUR global credentials for outgoing request
-            auth = HTTPBasicAuth(settings.OUR_NODE_USERNAME, settings.OUR_NODE_PASSWORD)
+            
+            auth = HTTPBasicAuth(remote_node.username, remote_node.password)
             
             print(f"[FOLLOW] POSTing to {inbox_url}")
+            print(f"[FOLLOW] Payload: {follow_request_data}")
             response = requests.post(
                 inbox_url,
                 json=follow_request_data,
@@ -326,10 +364,9 @@ def api_follow_author(request):
                 try:
                     author_response = requests.get(
                         target_author_url,
-                        auth=HTTPBasicAuth(settings.OUR_NODE_USERNAME, settings.OUR_NODE_PASSWORD),
+                        auth=HTTPBasicAuth(remote_node.username, remote_node.password),
                         timeout=5
                     )
-                    
                     if author_response.ok:
                         author_info = author_response.json()
                         display_name = author_info.get('displayName', 'Remote Author')
@@ -552,16 +589,23 @@ def followers_detail_api(request, author_id, foreign_author_fqid):
         github = ''
         profile_image = ''
         try:
-            resp = requests.get(
-                foreign_fqid,
-                auth=HTTPBasicAuth(settings.OUR_NODE_USERNAME, settings.OUR_NODE_PASSWORD),
-                timeout=5,
-            )
-            if resp.ok:
-                info = resp.json()
-                display_name = info.get('displayName', display_name)
-                github = info.get('github', github)
-                profile_image = info.get('profileImage', profile_image)
+            remote_node = None
+            for node in RemoteNode.objects.filter(is_active=True):
+                if foreign_fqid.startswith(node.base_url.rstrip('/')):
+                    remote_node = node
+                    break
+
+            if remote_node:
+                resp = requests.get(
+                    foreign_fqid,
+                    auth=HTTPBasicAuth(remote_node.username, remote_node.password),
+                    timeout=5,
+                )
+                if resp.ok:
+                    info = resp.json()
+                    display_name = info.get('displayName', display_name)
+                    github = info.get('github', github)
+                    profile_image = info.get('profileImage', profile_image)
         except Exception as e:
             print(f"[FOLLOWERS API] error fetching remote author info: {e}")
 

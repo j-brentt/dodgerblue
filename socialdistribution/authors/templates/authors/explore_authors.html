@@ -2,15 +2,14 @@
 {% block title %}Explore Authors{% endblock %}
 {% block content %}
 <div class="card profile-card">
-    <div class="profile-header">
-        <div class="profile-meta">
-            <h1 class="profile-username">Explore Authors</h1>
-        </div>
+    <div class="explore-header">
+        <h1>Explore Authors</h1>
+        <p>Discover and follow authors from your node and beyond</p>
     </div>
     
-    <div class="profile-section">
-        <h2>All Authors</h2>
-        <div id="authors-list">
+    <div id="authors-list">
+        <div class="loading-spinner">
+            <div class="spinner"></div>
             <p>Loading authors...</p>
         </div>
     </div>
@@ -247,6 +246,53 @@ function getCookie(name) {
 </script>
 
 <style>
+.container {
+      max-width: 800px !important; 
+      width: 100%;
+      margin-left: auto;
+      margin-right: auto;
+  }
+  .explore-header {
+      text-align: center;
+      padding-bottom: 24px;
+      margin-bottom: 24px;
+      border-bottom: 1px solid #eee;
+  }
+
+  .explore-header h1 {
+      margin: 0 0 8px 0;
+      font-size: 28px;
+      color: #333;
+  }
+
+  .explore-header p {
+      margin: 0;
+      color: #666;
+      font-size: 14px;
+  }
+
+  .loading-spinner {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 40px;
+      color: #666;
+  }
+
+  .spinner {
+      width: 32px;
+      height: 32px;
+      border: 3px solid #eee;
+      border-top-color: #1E90FF;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin-bottom: 12px;
+  }
+
+  @keyframes spin {
+      to { transform: rotate(360deg); }
+  }
+
   #authors-list .entry-list {
       list-style: none;
       margin: 0;
@@ -254,12 +300,19 @@ function getCookie(name) {
   }
 
   #authors-list .entry-item {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 16px;
-      padding: 12px 0;
-  }
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    padding: 16px;
+    margin-bottom: 12px;
+    background: #f8f9fa;
+    border-radius: 12px;
+}
+
+#authors-list .entry-item:last-child {
+    margin-bottom: 0;
+}
 
   #authors-list .entry-item-left {
       display: flex;

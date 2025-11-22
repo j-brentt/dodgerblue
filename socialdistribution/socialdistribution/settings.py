@@ -165,5 +165,5 @@ if _APP_DOMAINS:
 CSRF_TRUSTED_ORIGINS = [f"https://{h}" for h in _APP_DOMAINS]
 
 # For authenticating to remote nodes (example node credentials)
-OUR_NODE_USERNAME = "dodgerblue_node"
+OUR_NODE_USERNAME = "1234"
 OUR_NODE_PASSWORD = "1234"

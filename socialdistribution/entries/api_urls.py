@@ -101,6 +101,8 @@ urlpatterns = [
 
     # Inbox endpoint (which handles multiple types of objects)
     path("authors/<uuid:author_id>/inbox/", InboxView.as_view(), name="author-inbox"),
+    path("authors/<uuid:author_id>/inbox", InboxView.as_view(), name="author-inbox-no-slash"),
+
 
     # Image endpoints
     path("authors/<uuid:author_id>/entries/<uuid:entry_id>/image", EntryImageView.as_view(), name="author-entry-image"),
