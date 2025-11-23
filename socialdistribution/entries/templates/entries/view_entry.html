@@ -365,7 +365,6 @@
                         like{{ comment.likes_count|pluralize }}
                     </span>
                     {% if request.user.is_authenticated %}
-                        {% if request.user == comment.author or request.user == entry.author %}
                         <form method="post"
                               action="{% url 'entries:like_comment' comment.id %}"
                               class="comment-like-form"
@@ -530,9 +529,6 @@ document.addEventListener("DOMContentLoaded", function () {
             button.style.cursor = "default";
             button.classList.add("liked-button");
 
-            // ✔ OPTIONAL: fetch fresh list of likes if you ever show that
-            // (mirrors what entry likes do)
-            // fetch(`/api/comments/${commentId}/likes/?size=100`);
         })
         .catch(err => console.error(err));
     });
