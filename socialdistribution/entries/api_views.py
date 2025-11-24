@@ -884,9 +884,9 @@ def send_comment_to_author_inbox(comment: Comment, request):
     api_root = request.build_absolute_uri('/api/').rstrip('/')
 
     comment_url = request.build_absolute_uri(reverse("api:comment-detail", args=[comment.id]))
+    remote_api_root = f"{author_host}/api"
 
-    entry_url = f"{api_root}/authors/{author.id}/entries/{entry.id}/"
-
+    entry_url = f"{remote_api_root}/authors/{author.id}/entries/{entry.id}/"
     commenter_url = f"{api_root}/authors/{commenter.id}/"
     author_url = f"{author_host}/api/authors/{author.id}"
     inbox_url = f"{author_url}/inbox/"
@@ -912,8 +912,11 @@ def send_comment_to_author_inbox(comment: Comment, request):
     # Send to remote inbox
     try:
         auth = HTTPBasicAuth(remote_node.username, remote_node.password)
+        print(f"[COMMENT DEBUG] Comment refers to entry: {comment_object.get('entry')}")
+        print(f"[COMMENT DEBUG] Payload comment id: {comment_object.get('id')}")
+        print(f"[COMMENT DEBUG] Full payload: {comment_object}")
         print(f"[COMMENT] Sending comment to {inbox_url}")
-        
+                
         response = requests.post(
             inbox_url,
             json=comment_object,
