@@ -25,7 +25,7 @@ app_name = "api"
 urlpatterns = [
     path("entries/", PublicEntriesListView.as_view(), name="entries-list"),
     path("entries/<uuid:entry_id>/", EntryDetailView.as_view(), name="entry-detail"),
-    path("author/<uuid:author_id>/entries/", MyEntriesListView.as_view(), name="author-entries"),
+    path("authors/<uuid:author_id>/entries/", MyEntriesListView.as_view(), name="author-entries"),
     path("entries/<uuid:entry_id>/likes/", EntryLikesListView.as_view(), name="entry-likes"),
     path("entries/<uuid:entry_id>/like/", EntryLikeView.as_view(), name="entry-like"),
     path(

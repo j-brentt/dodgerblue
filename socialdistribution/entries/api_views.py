@@ -883,9 +883,13 @@ def send_comment_to_author_inbox(comment: Comment, request):
         return
     
     # Build URLs
+    api_root = request.build_absolute_uri('/api/').rstrip('/')
+
     comment_url = request.build_absolute_uri(reverse("api:comment-detail", args=[comment.id]))
-    entry_url = request.build_absolute_uri(reverse("api:entry-detail", args=[entry.id]))
-    commenter_url = request.build_absolute_uri(f"/api/authors/{commenter.id}/")
+
+    entry_url = f"{api_root}/authors/{author.id}/entries/{entry.id}/"
+
+    commenter_url = f"{api_root}/authors/{commenter.id}/"
     author_url = f"{author_host}/api/authors/{author.id}"
     inbox_url = f"{author_url}/inbox/"
     
