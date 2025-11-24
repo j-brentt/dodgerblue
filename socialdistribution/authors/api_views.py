@@ -273,7 +273,7 @@ def api_follow_author(request):
         
         try:
             
-            auth = HTTPBasicAuth(remote_node.username, remote_node.password)
+            auth = HTTPBasicAuth(settings.OUR_NODE_USERNAME, settings.OUR_NODE_PASSWORD)
             
             print(f"[FOLLOW] POSTing to {inbox_url}")
             print(f"[FOLLOW] Payload: {follow_request_data}")
