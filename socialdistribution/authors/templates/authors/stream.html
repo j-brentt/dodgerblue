@@ -6,7 +6,7 @@
 <style>
     /* Override container width for stream - make it wider */
     .container {
-        max-width: 1000px;
+        margin-top: 100px; 
     }
     
     .header {
@@ -18,7 +18,12 @@
         display: flex;
         justify-content: space-between;
         align-items: center;
-    }
+        position: fixed; 
+        top: 0; 
+        left: 0;
+        right: 0;
+        z-index: 1000; 
+        }
 
     .sub-header {
         margin: 40px 20px 20px 20px;
