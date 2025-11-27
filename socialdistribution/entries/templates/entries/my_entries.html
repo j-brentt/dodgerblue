@@ -3,25 +3,14 @@
 {% block title %}My Entries - Social Distribution{% endblock %}
 
 {% block content %}
+{% load static %}
+<link rel="stylesheet" href="{% static 'css/my_entries.css' %}">
+
 <style>
     .container {
         max-width: 800px;
         margin: auto;
-    }
-
-    .header {
-        background: white;
-        border-radius: 8px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        padding: 20px;
-        margin-bottom: 20px;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-    }
-
-    .header>h2 {
-        margin: 0;
+        margin: 5% auto 5%;
     }
 
     .entry-card {
@@ -31,6 +20,7 @@
         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         margin-bottom: 20px;
         background-color: #fff;
+        margin: 5% auto 7%;
     }
 
     .entry-header {
@@ -98,50 +88,28 @@
     .btn-back:hover {
         text-decoration: underline;
     }
-
-    .visibility-badge {
-        display: inline-block;
-        padding: 4px 12px;
-        border-radius: 12px;
-        margin-left: 8px;
-        font-size: 12px;
-        font-weight: 500;
-    }
-
-    .badge-public {
-        background-color: #e8f5e9;
-        color: #2e7d32;
-    }
-
-    .badge-friends {
-        background-color: #fff3e0;
-        color: #e65100;
-    }
-
-    .badge-unlisted {
-        background-color: #e3f2fd;
-        color: #1565c0;
-    }
-
-    .nav-links {
-        display: flex;
-        gap: 15px;
-    }
-
-    .nav-links a {
-        color: #1E90FF;
-        text-decoration: none;
-        font-weight: 500;
-    }
-
-    .nav-links a:hover {
-        text-decoration: underline;
-    }
 </style>
-<div class="header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-    <h2>Your Entries</h2>
-    <a href="{% url 'stream' %}" class="nav-links">Back to Stream</a>
+
+<div class="header">
+    <div class="user-info">
+        <h2>
+            <a href="{% url 'stream' %}" style="text-decoration: none; color: inherit;">DodgerBlue</a>
+        </h2>
+    </div>
+    <div class="nav-links">
+        <a href="{% url 'entries:create_entry' %}" class="new-entry-btn">New Entry</a>
+        <a href="{{ author.get_absolute_url }}">View Profile</a>
+        <a href="{% url 'authors:explore-authors'  %}">Explore Authors</a>
+        <a href="{% url 'authors:follow_requests' %}">Follow Requests{% if pending_follow_requests_count %} ({{ pending_follow_requests_count }}){% endif %}</a>
+        <a href="{% url 'entries:my_entries'  %}">My Entries</a>  
+
+        <form action="{% url 'authors:logout' %}" method="post" class="logout-form">
+            {% csrf_token %}
+            <button type="submit" class="logout-btn">Logout</button>
+        </form>
+    </div>
 </div>
+
 <div class="container">
     {% if entries %}
     {% for entry in entries %}

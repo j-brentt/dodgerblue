@@ -1,0 +1,365 @@
+
+.header {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    padding: 0.1% 5%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: fixed; 
+    top: 0; 
+    left: 0;
+    right: 0;
+    z-index: 1000; 
+}
+
+.sub-header {
+    margin: 5% 2% 2% 2%; 
+    font-size: 2vw; 
+}
+
+@font-face {
+    font-family: 'SuperAdorable';
+    src: url('../fonts/SuperAdorable-MAvyp.ttf') format('truetype');
+    font-weight: normal;
+    font-style: normal;
+}
+
+.user-info {
+    display: flex;
+    align-items: center;
+    font-size: 2%; /* Font size relative to the parent container */
+    padding: 1% 0;
+}
+
+.user-info>h2 {
+    font-family: 'SuperAdorable', sans-serif;
+    font-size: 40px; 
+    color: #1E90FF; 
+    font-weight: bold;
+    text-transform: uppercase; 
+    margin: 0; /* Remove default margins */
+    padding: 1% 0;
+}
+
+.nav-links {
+    display: flex;
+    align-items: center;
+    gap: 30px;
+}
+
+.nav-links a {
+    color: #1E90FF;
+    text-decoration: none;
+    font-weight: 500;
+    transition: transform 0.2s ease, background-color 0.2s ease;
+}
+
+.nav-links a:hover {
+    transform: scale(1.1);
+}
+
+.nav-links form {
+    display: inline;
+    margin: 0;
+}
+
+.entry-content {
+    text-align: left;
+}
+
+.entry-content img {
+    max-width: 70%;
+    height: auto;    
+    margin-bottom: 15px;
+    border-radius: 8px;
+}
+
+.visibility-badge {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.badge-public { background-color: #e8f5e9; color: #2e7d32; }
+.badge-friends { background-color: #fff3e0; color: #e65100; }
+.badge-unlisted { background-color: #e3f2fd; color: #1565c0; }
+
+.new-entry-btn {
+    background-color: #ffffff;
+    color: white;
+    padding: 8px 16px;
+    border-radius: 4px;
+    text-decoration: none;
+    transition: transform 0.2s ease, background-color 0.2s ease;
+}
+
+.new-entry-btn:hover {
+    transform: scale(1.1);
+}
+
+.logout-btn {
+    background: none;
+    border: none;
+    color: #1E90FF;
+    cursor: pointer;
+    padding: 0;
+    transition: transform 0.2s ease, background-color 0.2s ease;
+}
+
+.logout-btn:hover {
+    transform: scale(1.1);
+}
+
+/* General Styles */
+.sub-header {
+    font-size: 24px;
+    margin-bottom: 20px;
+    color: #333;
+}
+
+.card {
+    background: white;
+    border-radius: 30px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    padding: 2%;
+    margin-bottom: 5%;
+    width: 65%;
+    margin-left: auto; /* Center the card horizontally */
+    margin-right: auto;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    overflow: hidden;
+    word-wrap: break-word;
+    position: relative;
+}
+
+.card:hover {
+    transform: scale(1.05); /* Zoom in by 5% */
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); /* Add a stronger shadow on hover */
+}
+
+.empty-state {
+    text-align: center;
+    color: #666;
+    padding: 40px 20px;
+}
+
+.empty-state h3 {
+    margin-bottom: 10px;
+    color: #333;
+}
+
+/* Entry Header */
+.entry-header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #eee;
+}
+
+.author-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    object-fit: cover;
+    margin-right: 10px;
+}
+
+.author-placeholder {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: #ddd;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    color: #555;
+    margin-right: 10px;
+}
+
+.entry-author-info {
+    flex-grow: 1;
+}
+
+.author-name {
+    font-weight: 500;
+    color: #333;
+    margin-bottom: 3px;
+}
+
+.author-link {
+    color: #1E90FF;
+    text-decoration: none;
+    transition: transform 0.2s ease, background-color 0.2s ease;
+}
+
+.author-link:hover {
+    transform: scale(1.1);
+}
+
+.entry-date {
+    color: #999;
+    font-size: 13px;
+}
+
+/* Visibility Badge */
+.visibility-badge {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.badge-public {
+    background-color: #e8f5e9;
+    color: #2e7d32;
+}
+
+.badge-friends {
+    background-color: #fff3e0;
+    color: #e65100;
+}
+
+.badge-unlisted {
+    background-color: #e3f2fd;
+    color: #1565c0;
+}
+
+/* Entry Content */
+.entry-title {
+    margin-bottom: 10px;
+    font-size: 20px;
+}
+
+.entry-link {
+    color: #333;
+    text-decoration: none;
+    transition: transform 0.2s ease, background-color 0.2s ease;
+}
+
+.entry-link:hover {
+    transform: scale(1.1);
+}
+
+.entry-description {
+    color: #666;
+    margin-bottom: 15px;
+    font-size: 14px;
+}
+
+/* Entry Actions */
+.entry-actions {
+    display: flex;
+    gap: 15px;
+    padding-top: 10px;
+    border-top: 1px solid #eee;
+}
+
+.read-more-link {
+    color: #1E90FF;
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 500;
+    transition: transform 0.2s ease, background-color 0.2s ease;
+}
+
+.read-more-link:hover {
+    transform: scale(1.1);
+}
+
+/* Create Entry Link */
+.create-entry-link {
+    color: #1E90FF;
+    text-decoration: none;
+    font-weight: 500;
+    margin-top: 10px;
+    display: inline-block;
+    transition: transform 0.2s ease, background-color 0.2s ease;
+}
+
+.create-entry-link:hover {
+    transform: scale(1.1);
+}
+
+.footer {
+    background-color: #1E90FF; 
+    color: white; 
+    text-align: center; 
+    padding: 20px 0; 
+    position: fixed; 
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000; 
+}
+
+.footer-text {
+    font-family: 'SuperAdorable', sans-serif; 
+    font-size: 24px; 
+    margin: 0; 
+}
+
+/* Truncate description to 1 line */
+.description-preview {
+    display: -webkit-box;
+    -webkit-line-clamp: 1; /* Limit to 1 line */
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 14px;
+    line-height: 1.5;
+    margin-bottom: 10px;
+}
+
+/* Truncate content to 10 lines */
+.content-preview {
+    display: -webkit-box;
+    -webkit-line-clamp: 10; /* Limit to 10 lines */
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 14px;
+    line-height: 1.5;
+    margin-bottom: 10px;
+}
+
+/* Style for the expand button */
+.expand-btn {
+    background: none;
+    border: none;
+    color: #1E90FF;
+    font-weight: bold;
+    cursor: pointer;
+    padding: 0;
+    font-size: 14px;
+}
+
+/* Line clamp for 1 line */
+.line-clamp-1 {
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Line clamp for 10 lines */
+.line-clamp-10 {
+    display: -webkit-box;
+    -webkit-line-clamp: 10;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Expanded content */
+.expanded {
+    display: block;
+    overflow: visible;
+}

@@ -3,10 +3,12 @@
 {% block title %}{{ entry.title }} - Social Distribution{% endblock %}
 
 {% block content %}
+{% load static %}
+<link rel="stylesheet" href="{% static 'css/view_entry.css' %}">
 <style>
     .container {
         max-width: 1000px;
-        margin: 40px auto 0;
+        margin: 10% auto 7%; 
         padding: 0 20px;
     }
     h2 {
@@ -15,11 +17,16 @@
 
     .card {
         background: white;
-        border-radius: 8px;
+        border-radius: 20px;
         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         padding: 30px;
         margin-bottom: 20px;
         position: relative;
+        overflow: hidden;
+        word-wrap: break-word;
+        white-space: normal;
+        margin-left: auto; /* Center the card horizontally */
+        margin-right: auto;
     }
     /* Back button top-right */
     .btn-back {
@@ -205,6 +212,26 @@
 
 </style>
 
+<div class="header">
+    <div class="user-info">
+        <h2>
+            <a href="{% url 'stream' %}" style="text-decoration: none; color: inherit;">DodgerBlue</a>
+        </h2>
+    </div>
+    <div class="nav-links">
+        <a href="{% url 'entries:create_entry' %}" class="new-entry-btn">New Entry</a>
+        <a href="{{ author.get_absolute_url }}">View Profile</a>
+        <a href="{% url 'authors:explore-authors'  %}">Explore Authors</a>
+        <a href="{% url 'authors:follow_requests' %}">Follow Requests{% if pending_follow_requests_count %} ({{ pending_follow_requests_count }}){% endif %}</a>
+        <a href="{% url 'entries:my_entries'  %}">My Entries</a>  
+
+        <form action="{% url 'authors:logout' %}" method="post" class="logout-form">
+            {% csrf_token %}
+            <button type="submit" class="logout-btn">Logout</button>
+        </form>
+    </div>
+</div>
+
 <div class="card">
     <div class="entry-header">
         <div class="entry-meta">
@@ -233,11 +260,13 @@
     <div class="entry-content">
         {% if entry.content_type == 'text/markdown' %}
             <!-- Render markdown as HTML -->
-            {{ entry.content|render_markdown|safe }}
+            <div>
+                {{ entry.content|render_markdown|safe }}
+            </div>
         
         {% elif entry.content_type == 'text/plain' %}
             <!-- Display plain text with line breaks -->
-            <pre>{{ entry.content }}</pre>
+            <div style="white-space: pre-wrap;">{{ entry.content }}</div>
         
         {% elif "image" in entry.content_type %}
             <img src="data:{{ entry.content_type }};base64,{{ entry.content }}" 
@@ -246,10 +275,10 @@
         
         {% else %}
             <!-- Fallback -->
-            {{ entry.content }}
+            <div>{{ entry.content }}</div>
         {% endif %}
     </div>
-    
+
     <div class="likes-section" id="likes-section" style="margin-top: 20px; font-size: 0.95em;">
         {% if entry.liked_by.all %}
             {% if entry.liked_by.count > 0 %}
@@ -537,3 +566,7 @@ document.addEventListener("DOMContentLoaded", function () {
 </script>
 
 {% endblock %}
+
+<footer class="footer">
+    <p class="footer-text">DodgerBlue</p>
+</footer>

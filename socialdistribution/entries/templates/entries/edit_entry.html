@@ -3,6 +3,28 @@
 {% block title %}Edit Entry - Social Distribution{% endblock %}
 
 {% block content %}
+{% load static %}
+<link rel="stylesheet" href="{% static 'css/delete_edit_entry.css' %}">
+
+<div class="header">
+    <div class="user-info">
+        <h2>
+            <a href="{% url 'stream' %}" style="text-decoration: none; color: inherit;">DodgerBlue</a>
+        </h2>
+    </div>
+    <div class="nav-links">
+        <a href="{% url 'entries:create_entry' %}" class="new-entry-btn">New Entry</a>
+        <a href="{{ author.get_absolute_url }}">View Profile</a>
+        <a href="{% url 'authors:explore-authors'  %}">Explore Authors</a>
+        <a href="{% url 'authors:follow_requests' %}">Follow Requests{% if pending_follow_requests_count %} ({{ pending_follow_requests_count }}){% endif %}</a>
+        <a href="{% url 'entries:my_entries'  %}">My Entries</a>  
+
+        <form action="{% url 'authors:logout' %}" method="post" class="logout-form">
+            {% csrf_token %}
+            <button type="submit" class="logout-btn">Logout</button>
+        </form>
+    </div>
+</div>
 <style>
     .container { max-width: 800px; }
     textarea {
@@ -81,9 +103,9 @@
             </select>
         </div>
         
-        <button type="submit">Save Changes</button>
+        <button type="submit" class="btn-blue">Save Changes</button>
         <div class="link">
-            <a href="{% url 'entries:view_entry' entry.id %}">Cancel</a>
+            <a href="{% url 'entries:view_entry' entry.id %}" class="cancel-link">Cancel</a>
         </div>
     </form>
 </div>

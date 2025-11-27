@@ -3,13 +3,20 @@
 {% block title %}Create Entry - Social Distribution{% endblock %}
 
 {% block content %}
+{% load static %}
+<link rel="stylesheet" href="{% static 'css/create_entry.css' %}">
 <style>
-    .container { max-width: 800px; }
+    .container { 
+        max-width: 800px;
+        margin: 10% auto 7%; 
+        background: rgb(238, 238, 238);
+        border-radius: 20px;
+     }
     textarea {
         width: 100%;
         padding: 12px;
         border: 1px solid #ddd;
-        border-radius: 4px;
+        border-radius: 10px;
         font-size: 14px;
         font-family: inherit;
         resize: vertical;
@@ -51,6 +58,27 @@
     font-family: monospace;
 }
 </style>
+
+<div class="header">
+    <div class="user-info">
+        <h2>
+            <a href="{% url 'stream' %}" style="text-decoration: none; color: inherit;">DodgerBlue</a>
+        </h2>
+    </div>
+    <div class="nav-links">
+        <a href="{% url 'entries:create_entry' %}" class="new-entry-btn">New Entry</a>
+        <a href="{{ author.get_absolute_url }}">View Profile</a>
+        <a href="{% url 'authors:explore-authors'  %}">Explore Authors</a>
+        <a href="{% url 'authors:follow_requests' %}">Follow Requests{% if pending_follow_requests_count %} ({{ pending_follow_requests_count }}){% endif %}</a>
+        <a href="{% url 'entries:my_entries'  %}">My Entries</a>  
+
+        <form action="{% url 'authors:logout' %}" method="post" class="logout-form">
+            {% csrf_token %}
+            <button type="submit" class="logout-btn">Logout</button>
+        </form>
+    </div>
+</div>
+
 <div class="card">
     <h2>Create New Entry</h2>
     <form method="post" enctype="multipart/form-data">
@@ -89,9 +117,9 @@
             </select>
         </div>
         
-        <button type="submit">Create Entry</button>
+        <button type="submit" class="create_entry">Create Entry</button>
         <div class="link">
-            <a href="{% url 'stream' %}">Cancel</a>
+            <a href="{% url 'stream' %}" class="cancel-link">Cancel</a>
         </div>
     </form>
 </div>
@@ -131,3 +159,6 @@
     </script>
     
 {% endblock %}
+<footer class="footer">
+    <p class="footer-text">DodgerBlue</p>
+</footer>

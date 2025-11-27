@@ -3,102 +3,16 @@
 {% block title %}Stream - Social Distribution{% endblock %}
 
 {% block content %}
-<style>
-    /* Override container width for stream - make it wider */
-    .container {
-        margin-top: 100px; 
-    }
-    
-    .header {
-        background: white;
-        border-radius: 8px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        padding: 20px;
-        margin-bottom: 20px;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        position: fixed; 
-        top: 0; 
-        left: 0;
-        right: 0;
-        z-index: 1000; 
-        }
+{% load static %}
+<link rel="stylesheet" href="{% static 'css/stream.css' %}">
 
-    .sub-header {
-        margin: 40px 20px 20px 20px;
-        font-size: 20px;
-    }
-    
-    .user-info {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        font-size: 22px;
-    }
-
-    .user-info>h2 {
-        margin: 0;
-    }
-    
-    .nav-links {
-        display: flex;
-        align-items: center;
-        gap: 15px;
-    }
-    
-    .nav-links a {
-        color: #1E90FF;
-        text-decoration: none;
-        font-weight: 500;
-    }
-    
-    .nav-links a:hover {
-        text-decoration: underline;
-    }
-    .nav-links form {
-    display: inline;
-    margin: 0;
-    }
-    .entry-content {
-        text-align: left;
-    }
-
-    .entry-content img {
-        max-width: 70%;
-        height: auto;    
-        margin-bottom: 15px;
-        border-radius: 8px;
-    }
-
-
-    
-    .card {
-        background: white;
-        border-radius: 8px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        padding: 30px;
-        margin-bottom: 20px;
-    }
-    
-    .empty-state {
-        text-align: center;
-        color: #666;
-        padding: 40px 20px;
-    }
-    
-    .empty-state h3 {
-        margin-bottom: 10px;
-        color: #333;
-    }
-</style>
 
 <div class="header">
     <div class="user-info">
-        <h2>Welcome, {{ author.display_name }}!</h2>
+        <h2>Welcome!&nbsp;&nbsp;{{ author.display_name }}</h2>
     </div>
     <div class="nav-links">
-        <a href="{% url 'entries:create_entry' %}" style="background-color: #1E90FF; color: white; padding: 8px 16px; border-radius: 4px;">+ New Entry</a>
+        <a href="{% url 'entries:create_entry' %}" class="new-entry-btn">New Entry</a>
         <a href="{{ author.get_absolute_url }}">View Profile</a>
         <a href="{% url 'authors:explore-authors'  %}">Explore Authors</a>
         <a href="{% url 'authors:follow_requests' %}">Follow Requests{% if pending_follow_requests_count %} ({{ pending_follow_requests_count }}){% endif %}</a>
@@ -106,37 +20,37 @@
 
         <!-- From the prompt and the previous logout link format: Why does the logout link not redirect to login? 
         ChatGPT 4.5, OpenAI, 2025-10-09,https://chatgpt.com/c/68e7e183-3464-8321-9632-2877858f6937-->
-        <form action="{% url 'authors:logout' %}" method="post" style="display:inline;">
+        <form action="{% url 'authors:logout' %}" method="post" class="logout-form">
             {% csrf_token %}
-            <button type="submit" style="background:none; border:none; color:#1E90FF; cursor:pointer;">
-                Logout
-            </button>
+            <button type="submit" class="logout-btn">Logout</button>
         </form>
     </div>
 </div>
-<h3 class="sub-header">Your Stream</h3>
+
+<h3 class="sub-header"></h3>
+
 {% for entry in entries %}
     {% if entry.visibility != "DELETED" %}
-        <div class="card" style="margin-bottom: 20px;">
+        <div class="card">
             <!-- Entry header with author info -->
-            <div style="display: flex; align-items: center; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid #eee;">
+            <div class="entry-header">
                 {% if entry.author.profile_image %}
                     <img src="{{ entry.author.profile_image }}" 
                          alt="{{ entry.author.display_name }}" 
-                         style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover; margin-right: 10px;">
+                         class="author-avatar">
                 {% else %}
-                    <div style="width: 40px; height: 40px; border-radius: 50%; background: #ddd; display: flex; align-items: center; justify-content: center; font-weight: bold; color: #555; margin-right: 10px;">
+                    <div class="author-placeholder">
                         {{ entry.author.display_name|first|upper }}
                     </div>
                 {% endif %}
                 
-                <div style="flex-grow: 1;">
-                    <div style="font-weight: 500; color: #333; margin-bottom: 3px;">
-                        <a href="{% url 'authors:profile_detail' entry.author.id %}" style="color: #1E90FF; text-decoration: none;">
+                <div class="entry-author-info">
+                    <div class="author-name">
+                        <a href="{% url 'authors:profile_detail' entry.author.id %}" class="author-link">
                             {{ entry.author.display_name }}
                         </a>
                     </div>
-                    <div style="color: #999; font-size: 13px;">
+                    <div class="entry-date">
                         {{ entry.published|date:"F d, Y \a\t g:i A" }}
                     </div>
                 </div>
@@ -146,57 +60,57 @@
             </div>
             
             <div class="entry-content">
-                <h3 style="margin-bottom: 10px; font-size: 20px;">
-                    <a href="{% url 'entries:view_entry' entry.id %}" style="color: #333; text-decoration: none;">
+                <h3 class="entry-title">
+                    <a href="{% url 'entries:view_entry' entry.id %}" class="entry-link">
                         {{ entry.title }}
                     </a>
                 </h3>
             
                 {% if entry.description %}
-                    <p style="color: #666; margin-bottom: 15px; font-size: 14px;">
+                    <!-- Description with 1-line limit -->
+                    <p class="entry-description content-preview line-clamp-1" id="description-{{ entry.id }}">
                         {{ entry.description }}
                     </p>
+                    <button class="expand-btn" id="description-{{ entry.id }}-button" onclick="toggleContent('description-{{ entry.id }}', 1)">
+                        <strong>...</strong>
+                    </button>
+                    
                 {% endif %}
-                <!-- From the prompt: How do you view the image if the content type is image?
-                ChatGPT 4.5, OpenAI, 10-18-2025, https://chatgpt.com/c/68f02d9a-dea8-8324-a793-4ebc9004bc46 -->
+                
                 {% if "image" in entry.content_type %}
-                    <img src="data:{{ entry.content_type }};base64,{{ entry.content }}" alt="{{ entry.title }}">
-                    {% else %}
-                    <div class="markdown-content">
+                    <img src="data:{{ entry.content_type }};base64,{{ entry.content }}" alt="{{ entry.title }}" style="max-width:100%; margin-bottom:10px;">
+                    
+                    
+                {% else %}
+                    <!-- Content with 10-line limit -->
+                    <div class="markdown-content content-preview line-clamp-10" id="content-{{ entry.id }}">
                         {{ entry.content|render_markdown|safe }}
                     </div>
+                    <button class="expand-btn" id="content-{{ entry.id }}-button" onclick="toggleContent('content-{{ entry.id }}', 10)">
+                        <strong>...</strong>
+                    </button>
+                    
                 {% endif %}
             </div>
             <!-- Entry actions -->
-            <div style="display: flex; gap: 15px; padding-top: 10px; border-top: 1px solid #eee;">
-                <a href="{% url 'entries:view_entry' entry.id %}" style="color: #1E90FF; text-decoration: none; font-size: 14px; font-weight: 500;">
+            <div class="entry-actions">
+                <a href="{% url 'entries:view_entry' entry.id %}" class="read-more-link">
                     Read more →
                 </a>
             </div>
         </div>
     {% endif %}
 {% empty %}
-    <div class="card">
-        <div class="empty-state">
-            <h3>No entries yet</h3>
-            <p>When you or people you follow create entries, they'll appear here.</p>
-            <a href="{% url 'entries:create_entry' %}" style="color: #1E90FF; text-decoration: none; font-weight: 500; margin-top: 10px; display: inline-block;">
-                Create your first entry →
-            </a>
-        </div>
+    <div class="card empty-state">
+        <h3>No entries yet</h3>
+        <p>When you or people you follow create entries, they'll appear here.</p>
+        <a href="{% url 'entries:create_entry' %}" class="create-entry-link">
+            Create your first entry →
+        </a>
     </div>
 {% endfor %}
-
-<style>
-    .visibility-badge {
-        display: inline-block;
-        padding: 4px 12px;
-        border-radius: 12px;
-        font-size: 12px;
-        font-weight: 500;
-    }
-    .badge-public { background-color: #e8f5e9; color: #2e7d32; }
-    .badge-friends { background-color: #fff3e0; color: #e65100; }
-    .badge-unlisted { background-color: #e3f2fd; color: #1565c0; }
-</style>
+<script src="{% static 'js/main.js' %}"></script>
 {% endblock %}
+<footer class="footer">
+    <p class="footer-text">DodgerBlue</p>
+</footer>

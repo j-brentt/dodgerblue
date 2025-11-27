@@ -2,7 +2,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.db.models import Q
-from django.http import HttpResponseNotAllowed
+from django.http import HttpResponseNotAllowed, JsonResponse
 from django.urls import reverse, NoReverseMatch
 from .models import Author, FollowRequest, FollowRequestStatus
 from entries.models import Entry, Visibility
@@ -10,6 +10,8 @@ from .forms import ProfileEditForm
 from rest_framework.response import Response
 from rest_framework.decorators import api_view
 from .serializers import AuthorSerializer
+from entries.github_sync import create_github_entries_for_author
+from entries.api_views import send_entry_to_remote_followers
 
 def signup(request):
     """Handle user registration"""
@@ -340,3 +342,53 @@ def friends_list(request, author_id):
 def explore_authors(request):
     """Show explore authors page"""
     return render(request, 'authors/explore_authors.html')
+
+@login_required
+def sync_github(request):
+    """Sync GitHub activity for the current user and send to remote followers"""
+    if request.method != 'POST':
+        return HttpResponseNotAllowed(['POST'])
+    
+    author = request.user
+    
+    # Check if user has a GitHub URL set
+    if not author.github:
+        return JsonResponse({
+            'success': False,
+            'message': 'No GitHub URL set. Please add your GitHub profile URL in your profile settings.'
+        }, status=400)
+    
+    try:
+        # Create GitHub entries
+        count = create_github_entries_for_author(author)
+        
+        # Send each newly created GitHub entry to remote followers
+        # Get the entries that were just created (they have source_id set)
+        recent_github_entries = Entry.objects.filter(
+            author=author,
+            source_id__isnull=False
+        ).order_by('-published')[:count]
+        
+        for entry in recent_github_entries:
+            send_entry_to_remote_followers(entry, request)
+        
+        if count > 0:
+            messages.success(request, f'Successfully synced {count} GitHub activities!')
+            return JsonResponse({
+                'success': True,
+                'message': f'Successfully synced {count} GitHub activities!',
+                'count': count
+            })
+        else:
+            messages.info(request, 'No new GitHub activities to sync.')
+            return JsonResponse({
+                'success': True,
+                'message': 'No new GitHub activities to sync.',
+                'count': 0
+            })
+    except Exception as e:
+        messages.error(request, f'Error syncing GitHub: {str(e)}')
+        return JsonResponse({
+            'success': False,
+            'message': f'Error syncing GitHub: {str(e)}'
+        }, status=500)

@@ -2,6 +2,29 @@
 {% block title %}{{ profile_author.display_name }} · Profile{% endblock %}
 {% block content %}
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+{% load static %}
+<link rel="stylesheet" href="{% static 'css/profile_detail.css' %}">
+
+<div class="header">
+    <div class="user-info">
+        <h2>
+            <a href="{% url 'stream' %}" style="text-decoration: none; color: inherit;">DodgerBlue</a>
+        </h2>
+    </div>
+    <div class="nav-links">
+        <a href="{% url 'entries:create_entry' %}" class="new-entry-btn">New Entry</a>
+        <a href="{{ author.get_absolute_url }}">View Profile</a>
+        <a href="{% url 'authors:explore-authors'  %}">Explore Authors</a>
+        <a href="{% url 'authors:follow_requests' %}">Follow Requests{% if pending_follow_requests_count %} ({{ pending_follow_requests_count }}){% endif %}</a>
+        <a href="{% url 'entries:my_entries'  %}">My Entries</a>  
+
+        <form action="{% url 'authors:logout' %}" method="post" class="logout-form">
+            {% csrf_token %}
+            <button type="submit" class="logout-btn">Logout</button>
+        </form>
+    </div>
+</div>
+
 <div class="card profile-card">
     <div class="profile-header">
         {% if profile_author.profile_image %}
@@ -91,7 +114,7 @@
 </div>
 
 <div class="profile-actions">
-    <a href="{% url 'authors:stream'%}">Return back to stream</a>
+    <a href="{% url 'authors:stream' %}" class="white-back">Return back to stream</a>
 </div>
 
 <style>

@@ -3,6 +3,9 @@
 {% block title %}Login - Social Distribution{% endblock %}
 
 {% block content %}
+{% load static %}
+<link rel="stylesheet" href="{% static 'css/delete_edit_entry.css' %}">
+
 <div class="card">
     <h2>Login to Social Distribution</h2>
     
@@ -27,7 +30,7 @@
             <input type="password" id="password" name="password" required>
         </div>
         
-        <button type="submit">Login</button>
+        <button type="submit" style="background-color: #1E90FF; color: white; font-size: 14px; font-weight: bold;">Login</button>
     </form>
     
     <div class="link">

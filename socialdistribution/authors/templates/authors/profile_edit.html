@@ -4,6 +4,29 @@
 {% block title %}Edit Profile - Social Distribution{% endblock %}
 
 {% block content %}
+{% load static %}
+<link rel="stylesheet" href="{% static 'css/profile_edit.css' %}">
+
+<div class="header">
+    <div class="user-info">
+        <h2>
+            <a href="{% url 'stream' %}" style="text-decoration: none; color: inherit;">DodgerBlue</a>
+        </h2>
+    </div>
+    <div class="nav-links">
+        <a href="{% url 'entries:create_entry' %}" class="new-entry-btn">New Entry</a>
+        <a href="{{ author.get_absolute_url }}">View Profile</a>
+        <a href="{% url 'authors:explore-authors'  %}">Explore Authors</a>
+        <a href="{% url 'authors:follow_requests' %}">Follow Requests{% if pending_follow_requests_count %} ({{ pending_follow_requests_count }}){% endif %}</a>
+        <a href="{% url 'entries:my_entries'  %}">My Entries</a>  
+
+        <form action="{% url 'authors:logout' %}" method="post" class="logout-form">
+            {% csrf_token %}
+            <button type="submit" class="logout-btn">Logout</button>
+        </form>
+    </div>
+</div>
+
 <div class="card">
     <h2>Edit Profile</h2>
     
@@ -12,7 +35,17 @@
         
         {% for field in form %}
             <div class="form-group">
-                <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                <label for="{{ field.id_for_label }}">
+                    {{ field.label }}
+                    {% if field.name == 'github' %}
+                        <button type="button" class="sync-github-btn" onclick="confirmGitHubSync()" title="Sync GitHub Activity">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
+                            </svg>
+                            <span class="sync-text">Sync</span>
+                        </button>
+                    {% endif %}
+                </label>
                 {{ field }}
                 {% if field.help_text %}
                     <small>{{ field.help_text }}</small>
@@ -25,13 +58,63 @@
             </div>
         {% endfor %}
         
-        <button type="submit">Save Changes</button>
+        <button type="submit" class="btn-blue">Save Changes</button>
         
         <nav class="link">
-            <a href="{% url 'authors:stream'%}">Cancel and return to stream</a>
+            <a href="{% url 'authors:stream'%}" class="cancel-link">Cancel and return to stream</a>
         </nav>
     </form>
 </div>
+
+<script>
+function confirmGitHubSync() {
+    const confirmed = confirm(
+        'Performing this action will fetch your recent GitHub activity and create new entries for:\n\n' +
+        '• Push events\n' +
+        '• Issues created\n' +
+        '• Repository forks\n\n' +
+        'These entries will be visible as PUBLIC posts and will be sent to your followers.\n\n' +
+        'Do you want to continue?'
+    );
+    
+    if (confirmed) {
+        syncGitHub();
+    }
+}
+
+function syncGitHub() {
+    // Disable the button and show loading state
+    const btn = document.querySelector('.sync-github-btn');
+    const originalHTML = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation: spin 1s linear infinite;"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg><span class="sync-text">Syncing...</span>';
+    
+    fetch('{% url "authors:sync_github" %}', {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': '{{ csrf_token }}',
+            'Content-Type': 'application/json',
+        },
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert(data.message);
+            // Optionally redirect to stream to see the new entries
+            window.location.href = '{% url "authors:stream" %}';
+        } else {
+            alert('Error: ' + data.message);
+            btn.disabled = false;
+            btn.innerHTML = originalHTML;
+        }
+    })
+    .catch(error => {
+        alert('Error syncing GitHub: ' + error);
+        btn.disabled = false;
+        btn.innerHTML = originalHTML;
+    });
+}
+</script>
 
 <style>
     small {
@@ -52,6 +135,52 @@
     input[type="url"]:focus {
         outline: none;
         border-color: #1E90FF;
+    }
+    
+    .sync-github-btn {
+        display: inline-flex !important;
+        align-items: center !important;
+        gap: 4px !important;
+        margin-left: 8px !important;
+        background-color: #24292e !important;
+        color: white !important;
+        border: none !important;
+        padding: 4px 8px !important;
+        border-radius: 4px !important;
+        cursor: pointer !important;
+        font-size: 12px !important;
+        transition: all 0.2s !important;
+        vertical-align: middle !important;
+        width: auto !important;
+        min-width: auto !important;
+        max-width: fit-content !important;
+    }
+    
+    .sync-github-btn:hover:not(:disabled) {
+        background-color: #1a1e22 !important;
+        transform: scale(1.05) !important;
+    }
+    
+    .sync-github-btn:disabled {
+        opacity: 0.6 !important;
+        cursor: not-allowed !important;
+    }
+    
+    .sync-github-btn svg {
+        flex-shrink: 0;
+    }
+    
+    .sync-text {
+        font-weight: 500;
+    }
+    
+    @keyframes spin {
+        from {
+            transform: rotate(0deg);
+        }
+        to {
+            transform: rotate(360deg);
+        }
     }
 </style>
 {% endblock %}

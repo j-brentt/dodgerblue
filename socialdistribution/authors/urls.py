@@ -31,6 +31,9 @@ urlpatterns = [
 
     path('explore/', views.explore_authors, name='explore-authors'),
 
+    # GitHub sync
+    path('sync-github/', views.sync_github, name='sync_github'),
+
     # Main app pages (requires login)
     path('stream/', views.stream, name='stream'),
 ]
