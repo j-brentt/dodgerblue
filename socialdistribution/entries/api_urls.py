@@ -17,7 +17,9 @@ from .api_views import (
     CommentDetailView,
     CommentLikeView,
     render_markdown_entry,
-    InboxView
+    InboxView,
+    AuthorEntryImageView,
+    EntryFQIDImageView
 )
 
 app_name = "api"
@@ -51,6 +53,8 @@ urlpatterns = [
     path("comments/<uuid:comment_id>/", CommentDetailView.as_view(), name="comment-detail"),
     path("comments/<uuid:comment_id>/like/", CommentLikeView.as_view(), name="comment-like"),
     path("upload-image/", upload_image, name="upload_image"),
+    path("authors/<uuid:author_id>/entries/<uuid:entry_id>/image", AuthorEntryImageView.as_view(), name="author-entry-image"),
+    path( "entries/<path:entry_fqid>/image", EntryFQIDImageView.as_view(), name="entry-fqid-image"),
     path('entries/<uuid:entry_id>/rendered/', render_markdown_entry, name='entry-rendered'),
 
     path("authors/<uuid:author_id>/inbox/", InboxView.as_view(), name="author-inbox"),

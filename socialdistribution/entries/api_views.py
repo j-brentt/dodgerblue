@@ -565,6 +565,106 @@ def send_entry_to_remote_followers(entry: Entry, request):
             print(f"[send_entry_to_remote_followers] ERROR sending to {inbox_url}: {e}")
             continue
 
+class AuthorEntryImageView(APIView):
+    """
+    GET /api/authors/<uuid:author_id>/entries/<uuid:entry_id>/image
+    Returns the entry content decoded as binary image data.
+
+    - Only PUBLIC entries are served.
+    - Entry.content_type must start with 'image/'.
+    - Entry.content is expected to be base64-encoded.
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request, author_id, entry_id):
+        # Only serve public entries here
+        entry = get_object_or_404(
+            Entry,
+            id=entry_id,
+            author__id=author_id,
+            visibility=Visibility.PUBLIC,
+        )
+
+        content_type = (entry.content_type or "").lower()
+        if not content_type.startswith("image/"):
+            # Not an image entry
+            raise Http404("Entry is not an image")
+
+        raw_content = entry.content or ""
+        # Some implementations may store "data:<ct>;base64,<data>"
+        if raw_content.startswith("data:"):
+            try:
+                header, b64_data = raw_content.split(",", 1)
+            except ValueError:
+                raise Http404("Invalid image data")
+        else:
+            b64_data = raw_content
+
+        try:
+            binary = base64.b64decode(b64_data, validate=True)
+        except (binascii.Error, ValueError):
+            raise Http404("Invalid image data")
+
+        from django.http import HttpResponse
+
+        response = HttpResponse(binary, content_type=content_type)
+        # Optional: basic cache headers (can be tuned or removed)
+        response["Cache-Control"] = "public, max-age=3600"
+        return response
+
+
+class EntryFQIDImageView(APIView):
+    """
+    GET /api/entries/<path:entry_fqid>/image
+    Returns the entry (resolved from FQID) decoded as binary image data.
+
+    - FQID is a full URL; we extract the final path segment as the UUID.
+    - Only PUBLIC entries are served.
+    - Entry.content_type must start with 'image/'.
+    - Entry.content is expected to be base64-encoded.
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request, entry_fqid):
+        decoded = unquote(entry_fqid).strip().rstrip("/")
+        if not decoded:
+            raise Http404("Entry not found")
+
+        parts = [p for p in decoded.split("/") if p]
+        entry_id = parts[-1] if parts else None
+        if not entry_id:
+            raise Http404("Entry not found")
+
+        # Only serve public entries
+        entry = get_object_or_404(
+            Entry,
+            id=entry_id,
+            visibility=Visibility.PUBLIC,
+        )
+
+        content_type = (entry.content_type or "").lower()
+        if not content_type.startswith("image/"):
+            raise Http404("Entry is not an image")
+
+        raw_content = entry.content or ""
+        if raw_content.startswith("data:"):
+            try:
+                header, b64_data = raw_content.split(",", 1)
+            except ValueError:
+                raise Http404("Invalid image data")
+        else:
+            b64_data = raw_content
+
+        try:
+            binary = base64.b64decode(b64_data, validate=True)
+        except (binascii.Error, ValueError):
+            raise Http404("Invalid image data")
+
+        from django.http import HttpResponse
+
+        response = HttpResponse(binary, content_type=content_type)
+        response["Cache-Control"] = "public, max-age=3600"
+        return response
 
 class MyEntriesListView(generics.ListCreateAPIView):
     """
