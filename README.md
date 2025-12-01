@@ -23,6 +23,10 @@ MIT [License](LICENSE)
 
 # API Documentation
 
+**Swagger / OpenAPI UI:**  
+You can view the interactive Swagger API documentation at:  
+`/api/schema/swagger-ui/`  
+
 ## GET /api/entries
 
   
