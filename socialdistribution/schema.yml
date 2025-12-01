@@ -1,0 +1,985 @@
+openapi: 3.0.3
+info:
+  title: SocialDistribution API (Team DodgerBlue)
+  version: 1.0.0
+  description: OpenAPI schema for the SocialDistribution federated social network.
+paths:
+  /api/authors/:
+    get:
+      operationId: authors_list
+      description: |-
+        GET /api/authors/
+        Returns a list of approved public authors.
+        Accessible to both remote nodes and local users
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      tags:
+      - authors
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedAuthorList'
+          description: ''
+  /api/authors/{author_fqid}/liked/:
+    get:
+      operationId: authors_liked_retrieve
+      description: |-
+        GET /api/author/fqid/<path:author_fqid>/liked/
+        Returns a paginated list of all likes made by the author.
+      parameters:
+      - in: path
+        name: author_fqid
+        schema:
+          type: string
+        required: true
+      tags:
+      - authors
+      security:
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+  /api/authors/{author_id}/entries/:
+    get:
+      operationId: authors_entries_list
+      description: |-
+        GET /api/author/<uuid:author_id>/entries/
+        POST /api/author/<uuid:author_id>/entries/
+      parameters:
+      - in: path
+        name: author_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      tags:
+      - authors
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedEntryList'
+          description: ''
+    post:
+      operationId: authors_entries_create
+      description: |-
+        GET /api/author/<uuid:author_id>/entries/
+        POST /api/author/<uuid:author_id>/entries/
+      parameters:
+      - in: path
+        name: author_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - authors
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EntryRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/EntryRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/EntryRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Entry'
+          description: ''
+  /api/authors/{author_id}/entries/{entry_id}/comments/{comment_id}/likes/:
+    get:
+      operationId: authors_entries_comments_likes_retrieve
+      description: |-
+        GET /api/entries/<uuid:entry_id>/comments/<uuid:comment_id>/likes/
+        Returns a paginated list of authors who liked the comment.
+      parameters:
+      - in: path
+        name: author_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: comment_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: entry_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - authors
+      security:
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+  /api/authors/{author_id}/entries/{entry_id}/likes/:
+    get:
+      operationId: authors_entries_likes_retrieve
+      description: |-
+        GET /api/author/<uuid:author_id>/entries/<uuid:entry_id>/likes/
+        Returns a paginated list of authors who liked the entry.
+      parameters:
+      - in: path
+        name: author_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: entry_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - authors
+      security:
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+  /api/authors/{author_id}/follow-status/:
+    get:
+      operationId: authors_follow_status_retrieve
+      description: |-
+        GET /api/authors/<uuid:author_id>/follow-status/
+        Check if the current user follows this author.
+        For REMOTE authors, never return 'pending' – from our node's POV it's
+        either 'following' (have a FollowRequest row) or 'not_following'.
+      parameters:
+      - in: path
+        name: author_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - authors
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/authors/{author_id}/inbox/:
+    post:
+      operationId: authors_inbox_create
+      description: |-
+        POST /api/authors/{AUTHOR_SERIAL}/inbox/
+        Receives entries, likes, comments, and follow requests from remote nodes.
+      parameters:
+      - in: path
+        name: author_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - authors
+      security:
+      - {}
+      responses:
+        '200':
+          description: No response body
+  /api/authors/{author_id}/liked/:
+    get:
+      operationId: authors_liked_retrieve_2
+      description: |-
+        GET /api/author/<uuid:author_id>/liked/
+        Returns a paginated list of all likes made by the author.
+      parameters:
+      - in: path
+        name: author_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - authors
+      security:
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+  /api/authors/{author_id}/liked/{like_id}/:
+    get:
+      operationId: authors_liked_retrieve_3
+      description: |-
+        GET /api/author/<uuid:author_id>/liked/<str:like_id>/
+        Retrieves a specific like made by the author.
+      parameters:
+      - in: path
+        name: author_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: like_id
+        schema:
+          type: string
+        required: true
+      tags:
+      - authors
+      security:
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+  /api/authors/{author_id}/unfollow/:
+    post:
+      operationId: authors_unfollow_create
+      description: |-
+        POST /api/authors/<uuid:author_id>/unfollow/
+        Unfollow an author (local or remote)
+      parameters:
+      - in: path
+        name: author_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - authors
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/authors/{id}/:
+    get:
+      operationId: authors_retrieve
+      description: |-
+        GET /api/author/<id>
+        Used to retrieve the author details and serialize them
+        Accessible to both remote nodes and local users (public data)
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - authors
+      security:
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Author'
+          description: ''
+  /api/authors/explore/:
+    get:
+      operationId: authors_explore_retrieve
+      description: |-
+        GET /api/authors/explore/
+        Returns all local authors + authors from connected remote nodes
+        Only accessible to local authenticated users (not remote nodes)
+      tags:
+      - authors
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/authors/follow/:
+    post:
+      operationId: authors_follow_create
+      description: |-
+        POST /api/authors/follow/
+        API endpoint for following local or remote authors
+        Body: { "author_id": "full URL of author to follow" }
+        Only accessible to local authenticated users
+      tags:
+      - authors
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/comments/{comment_id}/:
+    get:
+      operationId: comments_retrieve
+      description: GET /api/comments/<comment_id>/
+      parameters:
+      - in: path
+        name: comment_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - comments
+      security:
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Comment'
+          description: ''
+  /api/comments/{comment_id}/like/:
+    post:
+      operationId: comments_like_create
+      description: POST /api/comments/<comment_id>/like/
+      parameters:
+      - in: path
+        name: comment_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - comments
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/entries/:
+    get:
+      operationId: entries_list
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      tags:
+      - entries
+      security:
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedEntryList'
+          description: ''
+  /api/entries/{entry_id}/:
+    get:
+      operationId: entries_retrieve
+      description: |-
+        GET /api/entries/<uuid:entry_id>/
+        Returns a single entry if visible to the requester.
+      parameters:
+      - in: path
+        name: entry_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - entries
+      security:
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Entry'
+          description: ''
+  /api/entries/{entry_id}/comments/:
+    get:
+      operationId: entries_comments_list
+      description: |-
+        GET /api/entries/<entry_id>/comments/
+        POST /api/entries/<entry_id>/comments/
+      parameters:
+      - in: path
+        name: entry_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      tags:
+      - entries
+      security:
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedCommentList'
+          description: ''
+    post:
+      operationId: entries_comments_create
+      description: |-
+        GET /api/entries/<entry_id>/comments/
+        POST /api/entries/<entry_id>/comments/
+      parameters:
+      - in: path
+        name: entry_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - entries
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommentRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CommentRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CommentRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Comment'
+          description: ''
+  /api/entries/{entry_id}/edit/:
+    get:
+      operationId: entries_edit_retrieve
+      description: |-
+        GET / PUT / DELETE /api/entries/<uuid:entry_id>/edit/
+        Only the author can edit or delete their entry.
+      parameters:
+      - in: path
+        name: entry_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - entries
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Entry'
+          description: ''
+    put:
+      operationId: entries_edit_update
+      description: |-
+        GET / PUT / DELETE /api/entries/<uuid:entry_id>/edit/
+        Only the author can edit or delete their entry.
+      parameters:
+      - in: path
+        name: entry_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - entries
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EntryRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/EntryRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/EntryRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Entry'
+          description: ''
+    patch:
+      operationId: entries_edit_partial_update
+      description: |-
+        GET / PUT / DELETE /api/entries/<uuid:entry_id>/edit/
+        Only the author can edit or delete their entry.
+      parameters:
+      - in: path
+        name: entry_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - entries
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedEntryRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedEntryRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedEntryRequest'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Entry'
+          description: ''
+    delete:
+      operationId: entries_edit_destroy
+      description: |-
+        GET / PUT / DELETE /api/entries/<uuid:entry_id>/edit/
+        Only the author can edit or delete their entry.
+      parameters:
+      - in: path
+        name: entry_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - entries
+      security:
+      - cookieAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/entries/{entry_id}/like/:
+    post:
+      operationId: entries_like_create
+      description: POST /api/entries/<uuid:entry_id>/like/
+      parameters:
+      - in: path
+        name: entry_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - entries
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/entries/{entry_id}/likes/:
+    get:
+      operationId: entries_likes_retrieve
+      description: |-
+        GET /api/entries/<uuid:entry_id>/likes/
+        Returns a paginated list of authors who liked the entry.
+      parameters:
+      - in: path
+        name: entry_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - entries
+      security:
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+  /api/liked/{like_id}/:
+    get:
+      operationId: liked_retrieve
+      description: |-
+        GET /api/liked/<str:like_id>/
+        Retrieves a specific like by its identifier.
+      parameters:
+      - in: path
+        name: like_id
+        schema:
+          type: string
+        required: true
+      tags:
+      - liked
+      security:
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+components:
+  schemas:
+    Author:
+      type: object
+      description: |-
+        Serializer for the Author model, used in the API to convert author instances
+        to JSON and vice versa.
+      properties:
+        type:
+          type: string
+          readOnly: true
+          default: author
+        id:
+          type: string
+          readOnly: true
+        host:
+          type: string
+          readOnly: true
+        displayName:
+          type: string
+        github:
+          type: string
+        profileImage:
+          type: string
+        web:
+          type: string
+          readOnly: true
+      required:
+      - displayName
+      - github
+      - host
+      - id
+      - profileImage
+      - type
+      - web
+    AuthorRequest:
+      type: object
+      description: |-
+        Serializer for the Author model, used in the API to convert author instances
+        to JSON and vice versa.
+      properties:
+        displayName:
+          type: string
+          minLength: 1
+        github:
+          type: string
+        profileImage:
+          type: string
+      required:
+      - displayName
+      - github
+      - profileImage
+    Comment:
+      type: object
+      description: Serializer for comment objects exposed via the API.
+      properties:
+        type:
+          type: string
+          readOnly: true
+          default: comment
+        id:
+          type: string
+          readOnly: true
+        entry:
+          type: string
+          readOnly: true
+        author:
+          allOf:
+          - $ref: '#/components/schemas/Author'
+          readOnly: true
+        content:
+          type: string
+        published:
+          type: string
+          format: date-time
+          readOnly: true
+        likes:
+          type: string
+          readOnly: true
+      required:
+      - author
+      - content
+      - entry
+      - id
+      - likes
+      - published
+      - type
+    CommentRequest:
+      type: object
+      description: Serializer for comment objects exposed via the API.
+      properties:
+        content:
+          type: string
+          minLength: 1
+      required:
+      - content
+    ContentTypeEnum:
+      enum:
+      - text/plain
+      - text/markdown
+      - image/png;base64
+      - image/jpeg;base64
+      type: string
+      description: |-
+        * `text/plain` - Plain Text
+        * `text/markdown` - Markdown
+        * `image/png;base64` - PNG Image
+        * `image/jpeg;base64` - JPEG Image
+    Entry:
+      type: object
+      description: |-
+        Serializer for the Entry model, used in the API to convert Entry instances
+        to JSON and vice versa. Includes nested author information.
+      properties:
+        type:
+          type: string
+          readOnly: true
+          default: entry
+        id:
+          type: string
+          readOnly: true
+        web:
+          type: string
+          readOnly: true
+        title:
+          type: string
+          maxLength: 200
+        description:
+          type: string
+          description: Brief description of the entry
+        contentType:
+          type: string
+          readOnly: true
+        content_type:
+          $ref: '#/components/schemas/ContentTypeEnum'
+        content:
+          type: string
+          description: Main content of the entry
+        visibility:
+          $ref: '#/components/schemas/VisibilityEnum'
+        published:
+          type: string
+          format: date-time
+          readOnly: true
+        author:
+          allOf:
+          - $ref: '#/components/schemas/Author'
+          readOnly: true
+        comments:
+          type: string
+          readOnly: true
+        likes:
+          type: string
+          readOnly: true
+      required:
+      - author
+      - comments
+      - content
+      - contentType
+      - id
+      - likes
+      - published
+      - title
+      - type
+      - web
+    EntryRequest:
+      type: object
+      description: |-
+        Serializer for the Entry model, used in the API to convert Entry instances
+        to JSON and vice versa. Includes nested author information.
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        description:
+          type: string
+          description: Brief description of the entry
+        content_type:
+          $ref: '#/components/schemas/ContentTypeEnum'
+        content:
+          type: string
+          minLength: 1
+          description: Main content of the entry
+        visibility:
+          $ref: '#/components/schemas/VisibilityEnum'
+      required:
+      - content
+      - title
+    PaginatedAuthorList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Author'
+    PaginatedCommentList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Comment'
+    PaginatedEntryList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Entry'
+    PatchedEntryRequest:
+      type: object
+      description: |-
+        Serializer for the Entry model, used in the API to convert Entry instances
+        to JSON and vice versa. Includes nested author information.
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        description:
+          type: string
+          description: Brief description of the entry
+        content_type:
+          $ref: '#/components/schemas/ContentTypeEnum'
+        content:
+          type: string
+          minLength: 1
+          description: Main content of the entry
+        visibility:
+          $ref: '#/components/schemas/VisibilityEnum'
+    VisibilityEnum:
+      enum:
+      - PUBLIC
+      - FRIENDS
+      - DELTED
+      - UNLISTED
+      type: string
+      description: |-
+        * `PUBLIC` - Public
+        * `FRIENDS` - Friends only
+        * `DELTED` - Deleted
+        * `UNLISTED` - Unlisted
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: sessionid

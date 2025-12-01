@@ -1,8 +1,8 @@
 from django.urls import path
 from .api_views import AuthorDetailView, AuthorListView, followers_list_api,followers_detail_api
 from . import api_views
-app_name = "authors_api"
 
+app_name = "authors_api"
 urlpatterns = [
     path('authors/<uuid:pk>/', AuthorDetailView.as_view(), name='author-detail'),
     path('authors/', AuthorListView.as_view(), name='authors-list'),

@@ -145,13 +145,26 @@ REST_FRAMEWORK = {
 
 # drf-spectacular (OpenAPI/Swagger)
 # Note: SECURITY = [] means the schema does not require auth globally,
-# keeping the Swagger "Authorize" dialog out of the way for most operations.
 SPECTACULAR_SETTINGS = {
-    'TITLE': 'SocialDistribution API',
-    'DESCRIPTION': 'OpenAPI schema for the SocialDistribution project',
-    'VERSION': '1.0.0',
-    'SERVE_INCLUDE_SCHEMA': False,
-    'SECURITY': [],  # do not advertise global auth in docs (endpoints can still enforce auth)
+    "TITLE": "SocialDistribution API (Team DodgerBlue)",
+    "DESCRIPTION": "OpenAPI schema for the SocialDistribution federated social network.",
+    "VERSION": "1.0.0",
+
+    # Only document API endpoints (ignore HTML views like /authors/, /entries/, etc)
+    "SCHEMA_PATH_PREFIX": "/api",
+
+    # Keep the raw /api/schema/ endpoint out of the Swagger UI itself
+    "SERVE_INCLUDE_SCHEMA": False,
+
+    # No *global* auth requirement in the docs (endpoints still enforce auth via DRF permissions)
+    "SECURITY": [],
+
+    # Make the /api/schema/swagger-ui/ page publicly viewable
+    "SERVE_PERMISSIONS": ["rest_framework.permissions.AllowAny"],
+    "SERVE_AUTHENTICATION": [],
+
+    # Nicer request/response split in the components section
+    "COMPONENT_SPLIT_REQUEST": True,
 }
 
 # Cron

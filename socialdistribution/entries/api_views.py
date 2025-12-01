@@ -11,7 +11,7 @@ from django.urls import reverse
 from .models import Entry, Visibility, Comment, RemoteNode
 from authors.models import FollowRequest, FollowRequestStatus, Author
 from authors.serializers import AuthorSerializer
-from .serializers import EntrySerializer, CommentSerializer
+from .serializers import EntrySerializer, CommentSerializer, InboxItemSerializer
 from django.http import JsonResponse
 import commonmark
 from rest_framework.decorators import api_view, permission_classes
@@ -30,6 +30,7 @@ from django.utils import timezone
 from authors.models import FollowRequest, FollowRequestStatus, Author
 from entries.models import Entry, Visibility, RemoteNode
 
+from drf_spectacular.utils import extend_schema
 
 def resolve_author_or_404(identifier: str) -> Author:
     decoded = unquote(identifier).strip()
@@ -257,12 +258,15 @@ class EntryDetailView(generics.RetrieveUpdateDestroyAPIView):
     GET /api/entries/<uuid:entry_id>/
     Returns a single entry if visible to the requester.
     """
+    serializer_class = EntrySerializer
     permission_classes = [permissions.AllowAny]
 
-    def get_object(self, entry_id):
+    def get_object(self):
         """
-        Retrieves the entry object from the database and returns it unless incorrect visibility
+        Retrieves the entry object from the database and returns it unless incorrect visibility.
+        Uses the `entry_id` path parameter.
         """
+        entry_id = self.kwargs.get("entry_id")
         entry = get_object_or_404(Entry, id=entry_id)
 
         if entry.visibility == "DELETED":
@@ -270,17 +274,23 @@ class EntryDetailView(generics.RetrieveUpdateDestroyAPIView):
 
         if entry.visibility == Visibility.FRIENDS and (
             not self.request.user.is_authenticated
-            or entry.author != self.request.user
-            and not entry.author.follow_requests_sent.filter(
-                followee=self.request.user, status=FollowRequestStatus.APPROVED
-            ).exists()
+            or (
+                entry.author != self.request.user
+                and not entry.author.follow_requests_sent.filter(
+                    followee=self.request.user,
+                    status=FollowRequestStatus.APPROVED,
+                ).exists()
+            )
         ):
             raise Http404("Entry not found")
 
         return entry
 
     def get(self, request, entry_id):
-        entry = self.get_object(entry_id)
+        """
+        Explicit GET handler kept for backwards compatibility and clarity.
+        """
+        entry = self.get_object()
         serializer = EntrySerializer(entry, context={"request": request})
         return Response(serializer.data)
     
@@ -1128,6 +1138,16 @@ class InboxView(APIView):
     Receives posts/entries, likes, comments, and follow requests from remote nodes.
     """
     authentication_classes = [RemoteNodeBasicAuthentication]
+
+    @extend_schema(
+        request=InboxItemSerializer,
+        responses={
+            201: {"type": "object", "properties": {"detail": {"type": "string"}}},
+            200: {"type": "object", "properties": {"detail": {"type": "string"}}},
+            400: {"type": "object", "properties": {"detail": {"type": "string"}}},
+            404: {"type": "object", "properties": {"detail": {"type": "string"}}},
+        },
+    )
     # RemoteNodeBasicAuthentication will 401 bad/unknown/inactive nodes.
     permission_classes = [permissions.AllowAny]
 
