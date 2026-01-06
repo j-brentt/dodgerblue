@@ -2,7 +2,11 @@
 CMPUT404-project-socialdistribution
 ===================================
 
-CMPUT404-project-socialdistribution
+DodgerBlue
+
+## Project Promo
+
+https://github.com/user-attachments/assets/00a8286f-706e-4ceb-b4d9-0ae74162bf25
 
 See [the web page](https://uofa-cmput404.github.io/general/project.html) for a description of the project.
 
