@@ -3,9 +3,27 @@ DodgerBlue
 
 https://github.com/user-attachments/assets/00a8286f-706e-4ceb-b4d9-0ae74162bf25
 
+**DodgerBlue** is a fully-featured **distributed social networking platform** built from the ground up to operate across independent servers — without relying on a central authority.
+
+Designed and implemented as part of a senior-level systems course, this project tackles real-world challenges such as **federated data sharing, authentication across nodes, pagination at scale, RESTful API design, and interoperability between independently deployed services**. Each node can host its own users and content while seamlessly exchanging posts and author data with other nodes in the network.
+
+The codebase demonstrates:
+- Thoughtful **backend architecture** using Django and Django REST Framework
+- A well-documented, standards-compliant **API (OpenAPI / Swagger)**
+- Practical handling of **distributed systems constraints**
+- Collaboration in a multi-developer environment with clear ownership and documentation
+
+This repository showcases not just *what* was built, but *how* complex systems can be designed, reasoned about, and extended — making it a strong example of production-minded software engineering.
+
+
 See [the web page](https://uofa-cmput404.github.io/general/project.html) for a description of this project.
 
-A distributed social network!
+## Tech Stack
+- Python, Django, Django REST Framework
+- PostgreSQL
+- OpenAPI / Swagger
+- Heroku deployment
+
 
 ## License
 
